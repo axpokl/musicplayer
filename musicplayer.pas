@@ -5,13 +5,13 @@ uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display,sysutil
 
 var i,j:longint;
 var rvoli:longword;
-var framerate:longword=60;
+var framerate:longword=120;
 var oldtime:real=0;
 var newtime:real=0;
 var showfps:boolean;
 var showmode:boolean;
 const ca:array[0..1]of longword=($9FFFFF,$9F0000);
-const cb:array[0..4]of longword=($1FFF1F,$1F1FFF,$00FFFF,$FF00FF,$FF1F1F);
+const cb:array[0..4]of longword=($1FFF1F,$3F3FFF,$00FFFF,$FF00FF,$FF1F1F);
 const cc:array[-1..11]of longword=(white,
 $FFFF00,$1F9FFF,$FF3F3F,$1FFF9F,$FF00FF,$9FFF1F,
 $3F3FFF,$FF9F1F,$00FFFF,$FF1F9F,$3FFF3F,$9F1FFF);
@@ -462,7 +462,7 @@ if showmode then
     drawtextln(modes[modei[0]],mixcolor(cc[modei[0]],ca[1],(modec-3)/4))
   end;
 fps:=getfps;
-showfps:=framerate<>fps;
+showfps:=abs(framerate-getfpsr)>1;
 if showfps then drawtextln(i2s(framerate)+'/'+i2s(fps),white);
 line(wpos,0,0,_h,white);
 //line(0,0,trunc(rvol/5*_w),0,yellow);
@@ -634,6 +634,7 @@ _wc.HIcon:=LoadImage(0,'musicplayer.ico',IMAGE_ICON,0,0,LR_LOADFROMFILE);
 sendmessage(_hw,WM_SETICON,ICON_SMALL,longint(_wc.HIcon));
 settitle('MusicPlayer made by ax_pokl');
 setfontname('Arial');
+setpenwidth(2);
 end;
 
 procedure initbass();
