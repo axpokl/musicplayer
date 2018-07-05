@@ -621,6 +621,7 @@ const GDIImageFormatBMP:TGUID='{557CF400-1A04-11D3-9A73-0000F81EF32E}';
       GDIImageFormatTIF:TGUID='{557CF405-1A04-11D3-9A73-0000F81EF32E}';
       GDIImageFormatPNG:TGUID='{557CF406-1A04-11D3-9A73-0000F81EF32E}';
       GDIImageFormatICO:TGUID='{557CF407-1A04-11D3-9A73-0000F81EF32E}';
+const DEFAULTCLASSNAME:PWideChar='DisplayClass';
 
 // Internal Variable 内部变量
 
@@ -631,7 +632,7 @@ var _w,_h,_x,_y:longint;              //窗口宽高坐标
 var _hw:longword;                     //窗口句柄
     _dc:longword;                     //绘图句柄
 
-var _wc:wndClass;                     //窗口注册结构
+var _wc:wndClassW;                    //窗口注册结构
     _wca:ATOM;                        //窗口注册句柄
     _ms:msg;                          //消息结构
     _mst:msg;                         //消息结构缓存
@@ -644,6 +645,7 @@ var _bufz:longword;                   //位图缓存当前位置
     _bufcb,_bufcg,_bufcr:byte;        //位图缓存当前颜色
 
 var _tbegin:double;                   //窗口建立时间
+    _tfreq,_tcount:Int64;
     _winb:boolean;                    //窗口状态
     _draw:procedure;                  //绘图函数
 
@@ -651,7 +653,7 @@ var _pe:longword;                     //画笔
     _pew:longword=1;                  //画刷
     _br:longword;                     //画刷
 
-var _fx,_fy:longword;                 //文字输出位置
+var _fx,_fy:longint;                  //文字输出位置
     _fw,_fh,_fwg:longword;            //字体长宽粗细
     _flt,_fud,                        //字体斜体下划线
     _fsk,_fcs:longword;               //字体删除线字符集
@@ -775,9 +777,13 @@ function NewThread(th:pointer):longword;
 procedure PauseThread(thi:longword);
 procedure ResumeThread(thi:longword);
 procedure StopThread(thi:longword);
+function MsgBoxW(s,title:unicodestring;i:longword):longword;
 function MsgBox(s,title:ansistring;i:longword):longword;
+procedure MsgBoxW(s,title:unicodestring);
 procedure MsgBox(s,title:ansistring);
+procedure MsgBoxW(s:unicodestring);
 procedure MsgBox(s:ansistring);
+procedure Delay(t:double);
 procedure Delay(t:longword);
 procedure Delay();
 procedure Sound(hz:longword;t:longword);
@@ -803,14 +809,18 @@ procedure SetDrawProcedure(th:tprocedure);
 function GetTimeR():double;
 function GetTime():longword;
 procedure SetTitle(s:ansistring);
-procedure SetSize(w,h:longword);
+procedure SetTitleW(s:unicodestring);
 function GetTitle():ansistring;
+function GetTitleW():unicodestring;
+procedure SetSize(w,h:longword);
 function GetWidth():longword;
 function GetHeight():longword;
 function GetSize():longword;
 function GetScrWidth():longint;
 function GetScrHeight():longint;
 function GetScrSize():longword;
+function GetScrCapsX():double;
+function GetScrCapsY():double;
 function GetBorderTitle():longint;
 function GetBorderWidth():longint;
 function GetBorderHeight():longint;
@@ -879,31 +889,32 @@ procedure GetStringSize(s:ansistring);
 function GetStringWidth(s:ansistring):longword;
 function GetStringHeight(s:ansistring):longword;
 
-procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longword;cfg:longword);
-procedure DrawTextXY(s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextXY(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;w,h:longword;cfg,cbg:longword);
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;cfg:longword);
+procedure DrawTextXY(s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextXY(s:ansistring;x,y:longint;cfg:longword);
 procedure DrawTextXY(s:ansistring;x,y:longword);
 procedure DrawText(s:ansistring;cfg,cbg:longword);
 procedure DrawText(s:ansistring;cfg:longword);
 procedure DrawText(s:ansistring);
-procedure DrawTextlnXY(s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextlnXY(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextlnXY(s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextlnXY(s:ansistring;x,y:longint;cfg:longword);
 procedure DrawTextlnXY(s:ansistring;x,y:longword);
 procedure DrawTextln(s:ansistring;cfg,cbg:longword);
 procedure DrawTextln(s:ansistring;cfg:longword);
 procedure DrawTextln(s:ansistring);
 procedure DrawTextln();
-procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longword;cfg:longword);
-procedure DrawTextXYw(s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextXYw(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longint;cfg:longword);
+procedure DrawTextXYw(s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextXYw(s:ansistring;x,y:longint;cfg:longword);
 procedure DrawTextXYw(s:ansistring;x,y:longword);
 procedure DrawTextw(s:ansistring;cfg,cbg:longword);
 procedure DrawTextw(s:ansistring;cfg:longword);
 procedure DrawTextw(s:ansistring);
-procedure DrawTextlnXYw(s:ansistring;x,y:longword;cfg,cbg:longword);
-procedure DrawTextlnXYw(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextlnXYw(s:ansistring;x,y:longint;cfg,cbg:longword);
+procedure DrawTextlnXYw(s:ansistring;x,y:longint;cfg:longword);
 procedure DrawTextlnXYw(s:ansistring;x,y:longword);
 procedure DrawTextlnw(s:ansistring;cfg,cbg:longword);
 procedure DrawTextlnw(s:ansistring;cfg:longword);
@@ -1049,6 +1060,7 @@ function GetMouseMove():longword;
 function WaitMouseMove():longword;
 function IsDropFile():boolean;
 function GetDropFile():ansistring;
+function GetDropFileW():unicodestring;
 function WaitDropFile():ansistring;
 function GetMouseAbsX():longint;
 function GetMouseAbsY():longint;
@@ -1107,7 +1119,7 @@ function GdiTransparentBlt(hdcd:HDC;xd,yd,wd,hd:longword;hdcs:HDC;xs,ys,ws,hs:lo
 function GdiAlphaBlend(hdcd:HDC;xd,yd,wd,hd:longword;hdcs:HDC;xs,ys,ws,hs:longword;ftn:BLENDFUNCTION):longword;stdcall;external 'gdi32.dll';
 
 function GdiplusStartup(var Token:Longword;Input,Output:Pointer):longint;stdcall;external 'gdiplus.dll';
-function GdipLoadImageFromFile(constFilename:PWCHAR;var Image:longword):longint;stdcall;external 'gdiplus.dll';
+function GdipLoadImageFromFile(const Filename:PWCHAR;var Image:longword):longint;stdcall;external 'gdiplus.dll';
 function GdipGetImageWidth(Image:longword;var width:longword):longint;stdcall;external 'gdiplus.dll';
 function GdipGetImageHeight(Image:longword;var height:longword):longint;stdcall;external 'gdiplus.dll';
 function GdipCreateFromHDC(hdc:HDC;var graphics:longword):longint;stdcall;external 'gdiplus.dll';
@@ -1158,7 +1170,6 @@ case uM of
     if (wp and 11>0) and (IsIconic(_hw)) then
       begin
       ShowWindow(_hw,SW_SHOW);
-      ShowWindow(_hw,SW_RESTORE);
       SetForegroundWindow(_hw);
       end;
     end;
@@ -1177,7 +1188,7 @@ case uM of
     if (GetMousePosX>=0) and (GetMousePosY>=0)
     and (GetMousePosX<=_w) and (GetMousePosY<=_h)
     then SetCursor(LoadCursor(0,IDC_ARROW))
-    else WndProc:=DefWindowProc(hW,uM,wP,lP);
+    else WndProc:=DefWindowProcW(hW,uM,wP,lP);
   WM_USER:
     begin
     _msusr[_msusri].message:=uM;
@@ -1197,23 +1208,23 @@ case uM of
     ExitThread(0);
     end;
   end;
-  WndProc:=DefWindowProc(hW,uM,wP,lP);
+  WndProc:=DefWindowProcW(hW,uM,wP,lP);
 end;
 
 function WinRegister():ATOM;
 begin
 with _wc do
   begin
-  style:=0;//CS_HREDRAW or CS_VREDRAW;
+  style:=CS_HREDRAW or CS_VREDRAW;
   lpfnWndProc:=@WndProc;
   cbClsExtra:=0;
   cbWndExtra:=0;
   hInstance:=MainInstance;
   hbrBackground:=CreateSolidBrush(_cbg);
   lpszMenuName:=nil;
-  lpszClassName:='DisplayClass';
+  lpszClassName:=DEFAULTCLASSNAME;
   end;
-WinRegister:=RegisterClass(_wc);
+WinRegister:=RegisterClassW(_wc);
 end;
 
 procedure WinCreate();
@@ -1229,7 +1240,7 @@ AdjustWindowRect(rect,_style,false);
 _w:=right-left;
 _h:=bottom-top;
 end;
-_hw:=CreateWindow(LPTSTR(DWORD(_wca)),nil,
+_hw:=CreateWindowW(DEFAULTCLASSNAME,nil,
 _style,_x,_y,_w,_h,0,0,MainInstance,nil);
 end;
 
@@ -1240,7 +1251,7 @@ if _wca=0 then
 WinCreate();
 WinCreateMain();
 _winb:=true;
-_tbegin:=GetTimeR();
+GetTimeR();_tbegin:=_tcount;
 while IsWin() do
   begin
   GetMessage(_mst,_hw,0,0);
@@ -1530,24 +1541,32 @@ begin Windows.ResumeThread(_th[thi]);end;
 procedure StopThread(thi:longword);
 begin Windows.TerminateThread(_th[thi],0);end;
 
+function MsgBoxW(s,title:unicodestring;i:longword):longword;
+begin MsgBoxW:=MessageBoxW(_hw,pwchar(s),pwchar(title),i);end;
 function MsgBox(s,title:ansistring;i:longword):longword;
 begin MsgBox:=MessageBox(_hw,pchar(s),pchar(title),i);end;
+procedure MsgBoxW(s,title:unicodestring);
+begin MsgboxW(s,title,0);end;
 procedure MsgBox(s,title:ansistring);
 begin Msgbox(s,title,0);end;
+procedure MsgBoxW(s:unicodestring);
+begin MsgBoxW(s,'');end;
 procedure MsgBox(s:ansistring);
 begin MsgBox(s,'');end;
 
+procedure Delay(t:double);var tbegin:double;
+begin tbegin:=GetTimeR();Sleep(max(0,trunc(t*1000)-1));While(GetTimeR()-tbegin)<t do ;end;
 procedure Delay(t:longword);
-begin if t=0 then t:=DELAYTIMEDEFAULT;Sleep(t);end;
+begin Sleep(t);end;
 procedure Delay();
-begin Delay(0);end;
+begin Delay(DELAYTIMEDEFAULT);end;
 
 procedure Sound(hz:longword;t:longword);
 begin if t=0 then t:=DELAYTIMEDEFAULT;if (hz<MINHZ) or (hz>MAXHZ) then Delay(t) else Windows.Beep(hz,t);end;
 procedure Sound(hz:longword;t:double);
 begin Sound(hz,longword(round(t)));end;
 procedure Sound(hz:longword);
-begin Sound(hz,0);end;
+begin Sound(hz,DELAYTIMEDEFAULT);end;
 
 procedure FreshFPS();
 begin
@@ -1616,18 +1635,23 @@ function IsWin():boolean;
 begin IsWin:=_winb;end;
 procedure SetDrawProcedure(th:tprocedure);
 begin _draw:=th;end;
-function GetTimeR():double;var freq,count:TLARGEINTEGER;
+function GetTimeR():double;
+var tfreq,tcount:Int64;
 begin
-QueryPerformanceFrequency(@freq);
-QueryPerformanceCounter(@count);
-GetTimeR:=count/freq-_tbegin;
+if QueryPerformanceFrequency(@tfreq)=true then _tfreq:=tfreq;
+if QueryPerformanceCounter(@tcount)=true then _tcount:=tcount;
+GetTimeR:=(_tcount-_tbegin)/_tfreq;
 end;
 function GetTime():longword;
 begin GetTime:=Trunc(GetTimeR*1000);end;
 procedure SetTitle(s:ansistring);
-begin SetWindowText(_hw,as2pc(s));end;
+begin SetWindowText(_hw,pchar(s));end;
+procedure SetTitleW(s:unicodestring);
+begin SetWindowTextW(_hw,pwchar(s));end;
 function GetTitle():ansistring;var c:array[0..MAXCHAR-1]of char;
-begin GetWindowText(_hw,@c,MAXCHAR);GetTitle:=pc2as(@c);end;
+begin GetWindowTextA(_hw,@c,MAXCHAR);GetTitle:=copy(pchar(@c),0,length(pchar(@c)));end;
+function GetTitleW():unicodestring;var c:array[0..MAXCHAR-1]of widechar;
+begin GetWindowTextW(_hw,@c,MAXCHAR);GetTitleW:=copy(pwchar(@c),0,length(pwchar(@c)));end;
 procedure SetSize(w,h:longword);var rect:TRECT;
 begin with rect do begin left:=GetPosX;top:=GetPosY;right:=left+w;bottom:=top+h;
 AdjustWindowRect(rect,_style,false);MoveWindow(_hw,GetPosX,GetPosY,right-left,bottom-top,true);end;end;
@@ -1643,6 +1667,10 @@ function GetScrHeight():longint;
 begin GetScrHeight:=GetSystemMetrics(SM_CYSCREEN);end;
 function GetScrSize():longword;
 begin GetScrSize:=GetScrWidth()*$10000+GetScrHeight();end;
+function GetScrCapsX():double;
+begin GetScrCapsX:=144/GetDeviceCaps(GetDC(GetDesktopWindow()),LOGPIXELSX);end;
+function GetScrCapsY():double;
+begin GetScrCapsY:=144/GetDeviceCaps(GetDC(GetDesktopWindow()),LOGPIXELSY);end;
 function GetBorderTitle():longint;
 begin GetBorderTitle:=GetSystemMetrics(SM_CYCAPTION);end;
 function GetBorderWidth():longint;
@@ -1889,7 +1917,7 @@ _flt,_fud,_fsk,_fcs,
 OUT_DEFAULT_PRECIS,
 ClIP_DEFAULT_PRECIS,
 DEFAULT_QUALITY,
-FF_DONTCARE,
+DEFAULT_PITCH or FF_DONTCARE,
 as2pc(_ffn));
 SelectObject(b^.dc,_fns);
 if _fh=0 then begin GetTextMetrics(_dc,_tm);_fh:=_tm.tmHeight;end;
@@ -1923,28 +1951,42 @@ begin GetStringSize(s);if _strz.cy>0 then GetStringWidth:=round(_strz.cx*_fh/_st
 function GetStringHeight(s:ansistring):longword;
 begin GetStringSize(s);if _strz.cy>0 then GetStringHeight:=round(_strz.cy*_fh/_strz.cy) else GetStringHeight:=0;end;
 
-procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure InitTextXY(var b:pbitmap;var s:ansistring;var cfg,cbg:longword);
 begin
 if b=nil then b:=_pmain;
 if s='' then s:=' ';
 if cfg=0 then cfg:=White;
 SetTextColor(b^.dc,cfg);
 if cbg=0 then
-  SetBkMode(b^.dc,TRANSPARENT)
+  SetBkMode(b^.dc,Windows.TRANSPARENT)
 else
   begin
   SetBkColor(b^.dc,cbg);
-  SetBkMode(b^.dc,OPAQUE);
+  SetBkMode(b^.dc,Windows.OPAQUE);
   end;
-TextOut(b^.dc,x,y,as2pc(s),length(s));
-_fx:=x+GetStringWidth(s);
-_fy:=y;
 end;
-procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;w,h:longword;cfg,cbg:longword);
+var lpRect:RECT;
+begin
+InitTextXY(b,s,cfg,cbg);
+lpRect.left:=x;
+lpRect.top:=y;
+lpRect.right:=x+w;
+lpRect.bottom:=y+h;
+Windows.DrawText(b^.dc,as2pc(s),length(s),lpRect,DT_SINGLELINE or DT_CENTER or DT_VCENTER);
+_fx:=x+w;_fy:=y;
+end;
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;cfg,cbg:longword);
+begin
+InitTextXY(b,s,cfg,cbg);
+TextOut(b^.dc,x,y,as2pc(s),length(s));
+_fx:=x+GetStringWidth(s);_fy:=y;
+end;
+procedure DrawTextXY(b:pbitmap;s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextXY(b,s,x,y,cfg,0);end;
-procedure DrawTextXY(s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure DrawTextXY(s:ansistring;x,y:longint;cfg,cbg:longword);
 begin DrawTextXY(nil,s,x,y,cfg,cbg);end;
-procedure DrawTextXY(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXY(s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextXY(nil,s,x,y,cfg);end;
 procedure DrawTextXY(s:ansistring;x,y:longword);
 begin DrawTextXY(s,x,y,0);end;
@@ -1954,9 +1996,9 @@ procedure DrawText(s:ansistring;cfg:longword);
 begin DrawText(s,cfg,0);end;
 procedure DrawText(s:ansistring);
 begin DrawText(s,0);end;
-procedure DrawTextlnXY(s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure DrawTextlnXY(s:ansistring;x,y:longint;cfg,cbg:longword);
 begin DrawTextXY(s,x,y,cfg,cbg);_fx:=x;_fy:=y+GetStringHeight(s);end;
-procedure DrawTextlnXY(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextlnXY(s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextlnXY(s,x,y,cfg,0);end;
 procedure DrawTextlnXY(s:ansistring;x,y:longword);
 begin DrawTextlnXY(s,x,y,0);end;
@@ -1968,29 +2010,18 @@ procedure DrawTextln(s:ansistring);
 begin DrawTextln(s,0);end;
 procedure DrawTextln();
 begin DrawTextln('');end;
-procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longint;cfg,cbg:longword);
 var fi:longword;
 begin
-if b=nil then b:=_pmain;
-if cfg=0 then cfg:=White;
-SetTextColor(b^.dc,cfg);
-if cbg=0 then
-  SetBkMode(b^.dc,Windows.TRANSPARENT)
-else
-  begin
-  SetBkColor(b^.dc,cbg);
-  SetBkMode(b^.dc,Windows.OPAQUE);
-  end;
-for fi:=1 to length(s) do
-begin TextOut(b^.dc,x,y,@s[fi],1);x:=x+_fw;end;
-_fx:=x;
-_fy:=y;
+InitTextXY(b,s,cfg,cbg);
+for fi:=1 to length(s) do begin TextOut(b^.dc,x,y,@s[fi],1);x:=x+_fw;end;
+_fx:=x;_fy:=y;
 end;
-procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXYw(b:pbitmap;s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextXYw(b,s,x,y,cfg,0);end;
-procedure DrawTextXYw(s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure DrawTextXYw(s:ansistring;x,y:longint;cfg,cbg:longword);
 begin DrawTextXYw(nil,s,x,y,cfg,cbg);end;
-procedure DrawTextXYw(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextXYw(s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextXYw(nil,s,x,y,cfg);end;
 procedure DrawTextXYw(s:ansistring;x,y:longword);
 begin DrawTextXYw(s,x,y,0);end;
@@ -2000,9 +2031,9 @@ procedure DrawTextw(s:ansistring;cfg:longword);
 begin DrawTextw(s,cfg,0);end;
 procedure DrawTextw(s:ansistring);
 begin DrawTextw(s,0);end;
-procedure DrawTextlnXYw(s:ansistring;x,y:longword;cfg,cbg:longword);
+procedure DrawTextlnXYw(s:ansistring;x,y:longint;cfg,cbg:longword);
 begin DrawTextXYw(s,x,y,cfg,cbg);_fx:=x;_fy:=y+_fh;end;
-procedure DrawTextlnXYw(s:ansistring;x,y:longword;cfg:longword);
+procedure DrawTextlnXYw(s:ansistring;x,y:longint;cfg:longword);
 begin DrawTextlnXYw(s,x,y,cfg,0);end;
 procedure DrawTextlnXYw(s:ansistring;x,y:longword);
 begin DrawTextlnXYw(s,x,y,0);end;
@@ -2673,7 +2704,9 @@ begin WaitMouseMove:=LO(WaitMsg(WM_MOUSEMOVE));end;
 function IsDropFile():boolean;
 begin IsDropFile:=IsMsg(WM_DROPFILES);end;
 function GetDropFile():ansistring;var c:array[0..MAXCHAR-1]of char;
-begin DragQueryFile(_ms.wParam,0,@c,MAXCHAR);GetDropFile:=pc2as(@c);end;
+begin DragQueryFileA(_ms.wParam,0,@c,MAXCHAR);GetDropFile:=copy(pchar(@c),0,length(pchar(@c)));end;
+function GetDropFileW():unicodestring;var c:array[0..MAXCHAR-1]of widechar;
+begin DragQueryFileW(_ms.wParam,0,@c,MAXCHAR);GetDropFileW:=copy(pwchar(@c),0,length(pwchar(@c)));end;
 function WaitDropFile():ansistring;
 begin WaitMsg(WM_DROPFILES);WaitDropFile:=GetDropFile();end;
 function GetMouseAbsX():longint;var p:point;
@@ -2685,9 +2718,9 @@ begin GetMouseWinX:=GetMouseAbsX-GetPosX;end;
 function GetMouseWinY():longint;
 begin GetMouseWinY:=GetMouseAbsY-GetPosY;end;
 function GetMousePosX():longint;
-begin GetMousePosX:=GetMouseWinX-GetBorderWidth;end;
+begin GetMousePosX:=GetMouseWinX;if not(_style and WS_POPUP=WS_POPUP) then GetMousePosX:=GetMousePosX-GetBorderWidth;end;
 function GetMousePosY():longint;
-begin GetMousePosY:=GetMouseWinY-GetBorderHeight-GetBorderTitle;end;
+begin GetMousePosY:=GetMouseWinY;if not(_style and WS_POPUP=WS_POPUP) then GetMousePosY:=GetMousePosY-GetBorderHeight-GetBorderTitle;end;
 
 // Audio Function 音频函数
 

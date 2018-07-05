@@ -1,7 +1,7 @@
 {$AppType GUI}
 {$R MusicPlayer.res}
 program MusicPlayer;
-uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display,sysutils;
+uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display,sysutils,lazutf8;
 
 var i,j:longint;
 var rvoli:longword;
@@ -19,16 +19,17 @@ const chdef=8;
 var ch:longword=chdef;
 var chsum:real;
 
-var stitle:ansistring;
+var stitle:AnsiString;
+var stitlew:UnicodeString;
 var nowindow:longword=0;
 var wpos:longint;
 
 var info:BASS_INFO;
-var fdir:ansistring;
-var fnames:ansistring;
-var fname:pchar;
+var fdir:unicodestring;
+var fnames:unicodestring;
+var fname:pwchar;
 var sf:BASS_MIDI_FONT;
-var fsf2s:ansistring;
+var fsf2s:unicodestring;
 var chan:longword;
 var chaninfo:BASS_CHANNELINFO;
 var channum:longword;
@@ -47,7 +48,7 @@ var frq:real=1;
 var frqi:longint=0;
 var pch:real=1;
 var pchi:longint=0;
-var key_ctrl,key_shift,key_alt:boolean;
+var key_ctrl,key_shift{,key_alt}:boolean;
 var key_pos:longword;
 var loop:longword;
 
@@ -66,7 +67,7 @@ var hpos:array[0..maxlog-1]of longint;
 var hposc:array[0..maxlog-1]of real;
 var x1,y1,x2,y2:longint;
 var modei:array[0..4]of shortint;
-var modeb:array[0..11]of shortint=(1,0,0,0,0,0,0,1,0,0,0,0);
+//var modeb:array[0..11]of shortint=(1,0,0,0,0,0,0,1,0,0,0,0);
 const modes:array[-1..11]of ansistring=
 ('-','A','A#','B','C','C#','D','D#','E','F','F#','G','G#');
 var mode:array[-1..11]of shortint;
@@ -74,9 +75,9 @@ var modec:shortint;
 var fps:longint;
 
 var hwm:HWND;
-var para:ansistring;
+var para:unicodestring;
 
-var regdp:DWORD=1;
+//var regdp:DWORD=1;
 var regkey:HKEY;
 
 procedure OpenKey();
@@ -91,13 +92,13 @@ begin
 RegCloseKey(regkey);
 end;
 
-procedure GetKeyS(kname:ansistring;var s:ansistring);
+procedure GetKeyS(kname:ansistring;var s:unicodestring);
 var regtype:longword=REG_SZ;
-var ca:array[0..$100-1]of byte;
-var size:longword=$100;
+var ca:array[0..MAXCHAR*2-1]of byte;
+var size:longword=MAXCHAR*2;
 begin
-if RegQueryValueEx(regkey,PChar(kname),nil,@regtype,@ca,@size)=ERROR_SUCCESS then
-  s:=PChar(@ca);
+if RegQueryValueExW(regkey,PWChar(unicodestring(kname)),nil,@regtype,@ca,@size)=ERROR_SUCCESS then
+  s:=copy(UnicodeString(pwchar(@ca)),0,length(unicodestring(pwchar(@ca))));
 end;
 
 procedure GetKeyQ(kname:ansistring;var i:qword);
@@ -121,9 +122,9 @@ if RegQueryValueEx(regkey,PChar(kname),nil,@regtype,@ca,@size)=ERROR_SUCCESS the
   i:=ca[3] shl 24 or ca[2] shl 16 or ca[1] shl 8 or ca[0]
 end;
 
-procedure SetKeyS(kname:ansistring;s:ansistring);
+procedure SetKeyS(kname:ansistring;s:unicodestring);
 begin
-RegSetValueEx(regkey,PChar(kname),0,REG_SZ,PChar(s),length(PChar(s)));
+RegSetValueExW(regkey,PWChar(UnicodeString(kname)),0,REG_SZ,PWChar(s),length(s)*2);
 end;
 
 procedure SetKeyI(kname:ansistring;i:longword);
@@ -137,13 +138,13 @@ RegSetValueEx(regkey,PChar(kname),0,11,@i,sizeof(QWORD));
 end;
 
 const find_max=$10000;
-var find_info:TSearchRec;
+var find_info:TUnicodeSearchRec;
 var find_count:longword;
 var find_current:longword;
-var find_result:array[0..find_max] of ansistring;
+var find_result:array[0..find_max] of unicodestring;
 
-procedure find_file(s:ansistring);
-var dir:ansistring;
+procedure find_file(s:unicodestring);
+var dir:unicodestring;
 begin
 find_current:=0;
 find_result[0]:='';
@@ -155,22 +156,22 @@ if find_current>find_count then
   begin
   find_count:=0;
   dir:=ExtractFilePath(s);
-  if findfirst(dir+'*',0,find_info)=0 then
+  if findfirst(dir+UnicodeString('*'),0,find_info)=0 then
     begin
     find_count:=find_count+1;
-    find_result[find_count]:=dir+find_info.name;
+    find_result[find_count]:=dir+UnicodeString(find_info.name);
     if find_result[find_count]=s then find_current:=find_count;
     while findnext(find_info)=0 do
       begin
       find_count:=find_count+1;
-      find_result[find_count]:=dir+find_info.name;
+      find_result[find_count]:=dir+UnicodeString(find_info.name);
       if find_result[find_count]=s then find_current:=find_count;
       end;
     end;
   end;
 end;
 
-function get_file(n:longword):ansistring;
+function get_file(n:longword):unicodestring;
 begin
 if n<1 then n:=n+find_count;
 if n>find_count then n:=n-find_count;
@@ -218,7 +219,7 @@ var lrcnum:longword;
 var lrctmax:longword;
 var lrcstr:ansistring;
 
-procedure checklrc(s:ansistring);
+procedure checklrc(s:UnicodeString);
 var flrc:text;
 var lrc:ansistring;
 begin
@@ -272,7 +273,7 @@ SetKeyI('framerate',framerate);
 SetKeyI('loop',loop);
 end;
 
-procedure playfile(s:ansistring);forward;
+procedure playfile(s:unicodestring);forward;
 
 procedure loadfile();
 begin
@@ -291,7 +292,7 @@ Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
 if fileexists(fsf2s) then playfile(fsf2s);
 end;
 
-procedure playfile(s:ansistring);
+procedure playfile(s:unicodestring);
 begin
 if copy(s,length(s)-2,3)='sf2' then fsf2s:=s
 else
@@ -300,10 +301,10 @@ find_file(s);
 //SetForegroundWindow(_hw);
 //ShowWindow(_hw,SW_SHOWNORMAL);
 fnames:=s;
-fname:=PChar(s);
+fname:=PWChar(s);
 Bass_MusicFree(chan);
 Bass_StreamFree(chan);
-chan:=Bass_StreamCreateFile(false,fname,0,0,BASS_STREAM_DECODE or BASS_STREAM_PRESCAN);
+chan:=Bass_StreamCreateFile(false,fname,0,0,BASS_STREAM_DECODE or BASS_STREAM_PRESCAN or BASS_UNICODE);
 chan:=Bass_FX_TempoCreate(chan,BASS_FX_FREESOURCE or loop);
 if (chan=0) then chan:=Bass_WMA_StreamCreateFile(false,fname,0,0,loop);
 if (chan=0) then chan:=Bass_FLAC_StreamCreateFile(false,fname,0,0,loop);
@@ -353,9 +354,9 @@ if frqi<0 then stitle:=stitle+'(-'+i2s(abs(frqi))+')';
 if bufmul<>2 then stitle:=stitle+'<'+i2s(bufmul)+'>';
 if ch<>chdef then stitle:=stitle+'<='+i2s(ch)+'>';
 if nowindow=BASS_DATA_FFT_NOWINDOW then stitle:=stitle+'<Hn>';
-stitle:=stitle+ExtractFileName(fnames);
+stitlew:=UnicodeString(stitle)+ExtractFileName(fnames);
 if not(Bass_channelIsActive(chan)=BASS_ACTIVE_STOPPED) then
-  SetTitle(stitle);
+  SetTitleW(stitlew);
 if Bass_channelIsActive(chan)=BASS_ACTIVE_PLAYING then
   begin
   Bass_ChannelGetData(chan,@fft,BASS_DATA_FFT4096 or nowindow);
@@ -378,7 +379,7 @@ for i:=0 to maxlog-1 do
 end;
 
 function getmode(start,step:shortint):shortint;
-var modea,modeas:array[-1..11]of real;
+//var modea,modeas:array[-1..11]of real;
 begin           {
 getmode:=-1;
 modeas[-1]:=0;
@@ -484,22 +485,22 @@ end;
 
 procedure helpproc();
 begin
-  if fileexists(fdir+'musicplayer.txt') then
-    WinExec(PChar('notepad.exe '+fdir+'musicplayer.txt'),SW_SHOW)
+  if fileexists(fdir+UnicodeString('musicplayer.txt')) then
+    ShellExecuteW(0,nil, PWChar(UnicodeString('notepad.exe')),PWChar(fdir+UnicodeString('musicplayer.txt')),nil,1)
   else
-    msgbox('Missing help file: '+fdir+'musicplayer.txt','Help file not found!');
+    MsgBoxW(UnicodeString('Missing help file: ')+fdir+UnicodeString('musicplayer.txt'),UnicodeString('Help file not found!'));
 end;
 
 procedure makeact();
 begin
 if ismsg(WM_USER) then
   begin
-  if _ms.lParam=0 then para:=para+chr(_ms.wParam mod $100);
+  if _ms.lParam=0 then para:=para+widechar(_ms.wParam mod $10000);
   if _ms.lParam=1 then para:='';
   if _ms.lParam=2 then Playfile(para);
   end;
 if isdropfile() then
-  Playfile(getdropfile());
+  Playfile(getdropfilew());
 if (ismouse() or ismsg($200)) and (_ms.wparam=1) then
   begin
   wpos:=getmouseposx();
@@ -511,7 +512,7 @@ if (ismouse() or ismsg($200)) and (_ms.wparam=1) then
   end;
 key_shift:=GetKeyState(VK_SHIFT)<0;
 key_ctrl:=GetKeyState(VK_CONTROL)<0;
-key_alt:=GetKeyState(VK_MENU)<0;
+//key_alt:=GetKeyState(VK_MENU)<0;
 if iskey(K_RIGHT) or iskey(K_LEFT) then
   begin
   key_pos:=1;
@@ -595,7 +596,7 @@ if iskey(K_ESC) then
 end;
 
 procedure LoopAudio();
-var s:ansistring;
+var s:unicodestring;
 begin
 len:=Bass_ChannelGetLength(chan,BASS_POS_BYTE);
 pos:=Bass_ChannelGetPosition(chan,BASS_POS_BYTE);
@@ -628,11 +629,11 @@ end;
 
 procedure initwin();
 begin
-_w:=round(getscrwidth/2.5);_h:=round(getscrheight/4);
+_w:=round(getscrwidth/2.5*GetScrCapsX);_h:=round(getscrheight/4*GetScrCapsY);
 createwin(_w,_h,ca[1],ca[1]);
 _wc.HIcon:=LoadImage(0,'musicplayer.ico',IMAGE_ICON,0,0,LR_LOADFROMFILE);
 sendmessage(_hw,WM_SETICON,ICON_SMALL,longint(_wc.HIcon));
-settitle('MusicPlayer made by ax_pokl');
+SetTitleW('MusicPlayer made by ax_pokl');
 setfontname('Arial');
 setpenwidth(2);
 end;
@@ -655,19 +656,19 @@ end;
 begin
 OpenKey();
 hwm:=FindWindow('DisplayClass',nil);
-fdir:=ParamStr(0);
+fdir:=UnicodeString(ParamStrUTF8(0));
 repeat
 if length(fdir)>0 then delete(fdir,length(fdir),1);
 until (length(fdir)<=1) or (fdir[length(fdir)]='\');
 fsf2s:=fdir+'midi.sf2';
-para:=ParamStr(1);
+para:=UnicodeString(ParamStrUTF8(1));
 if hwm<>0 then
   if para<>'' then
     begin
     SendMessage(hwm,WM_USER,0,1);
     for i:=1 to length(para) do
     begin
-      SendMessage(hwm,WM_USER,longword(ord(para[i])),0);
+      SendMessage(hwm,WM_USER,longword(word(para[i])),0);
       end;
     SendMessage(hwm,WM_USER,0,2);
     halt;
