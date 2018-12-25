@@ -425,7 +425,7 @@ for i:=0 to maxlog-1 do
   x2:=trunc((i+1)/maxlog*_w);
   y1:=_h-hpos[i];
   y2:=_h;
-  bar(x1,y1,x2-x1,y2-y1,mixcolor(cc[i mod 12],ca[0],maxlog*hposc[i]/chsum/ch));
+  bar(x1,y1,x2-x1,y2-y1,mixcolor(cc[(118-i) mod 12],ca[0],maxlog*hposc[i]/chsum/ch));
   end;
 if channum>0 then
 for i:=0 to _w*channum div bufmul+1 do
@@ -458,9 +458,9 @@ modec:=100;
 if showmode then
   begin
   if modei[0]>=0 then
-    drawtextln(modes[(modei[0]+frqi+120) mod 12],mixcolor(cc[modei[0]],ca[1],(modec-3)/4))
+    drawtextln(modes[(modei[0]+frqi+120) mod 12],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
   else
-    drawtextln(modes[modei[0]],mixcolor(cc[modei[0]],ca[1],(modec-3)/4))
+    drawtextln(modes[modei[0]],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
   end;
 fps:=getfps;
 showfps:=abs(framerate-getfpsr)>1;
