@@ -1,7 +1,7 @@
 {$AppType GUI}
 {$R MusicPlayer.res}
 program MusicPlayer;
-uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display,sysutils,lazutf8;
+uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display;
 
 var i,j:longint;
 var rvoli:longword;
@@ -138,13 +138,24 @@ RegSetValueEx(regkey,PChar(kname),0,11,@i,sizeof(QWORD));
 end;
 
 const find_max=$10000;
-var find_info:TUnicodeSearchRec;
+var find_handle:handle;
+var find_info:WIN32_FIND_DATAW;
 var find_count:longword;
 var find_current:longword;
 var find_result:array[0..find_max] of unicodestring;
+var find_dir:unicodestring;
+
+procedure add_file(s:unicodestring);
+begin
+if (find_info.cFilename<>'.') and (find_info.cFilename<>'..') then
+  begin
+  find_count:=find_count+1;
+  find_result[find_count]:=find_dir+UnicodeString(find_info.cFilename);
+  if find_result[find_count]=s then find_current:=find_count;
+  end;
+end;
 
 procedure find_file(s:unicodestring);
-var dir:unicodestring;
 begin
 find_current:=0;
 find_result[0]:='';
@@ -155,18 +166,12 @@ until find_result[find_current]=s;
 if find_current>find_count then
   begin
   find_count:=0;
-  dir:=ExtractFilePath(s);
-  if findfirst(dir+UnicodeString('*'),0,find_info)=0 then
+  find_dir:=GetFileDirW(s);
+  find_handle:=FindFirstFileW(PWideChar(find_dir+'*'),find_info);
+  if find_handle<>INVALID_HANDLE_VALUE then
     begin
-    find_count:=find_count+1;
-    find_result[find_count]:=dir+UnicodeString(find_info.name);
-    if find_result[find_count]=s then find_current:=find_count;
-    while findnext(find_info)=0 do
-      begin
-      find_count:=find_count+1;
-      find_result[find_count]:=dir+UnicodeString(find_info.name);
-      if find_result[find_count]=s then find_current:=find_count;
-      end;
+    add_file(s);
+    while FindNextFileW(find_handle,find_info) do add_file(s);
     end;
   end;
 end;
@@ -229,7 +234,7 @@ for i:=1 to length(s) do if s[i]='.' then j:=i;
 s:=copy(s,1,j-1)+'.lrc';
 //if fileexists(s) then
 //else s:=copy(s,1,j-1)+'.txt';
-if fileexists(s) then
+if IsFileW(s) then
   begin
   assign(flrc,s);
   reset(flrc);
@@ -287,9 +292,9 @@ GetKeyI('ch',ch);
 GetKeyI('framerate',framerate);
 GetKeyI('loop',loop);
 if (para<>'') and (para<>fnames) then begin fnames:=para;pos:=0;end;
-if fileexists(fnames) then playfile(fnames);
+if IsFileW(fnames) then playfile(fnames);
 Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
-if fileexists(fsf2s) then playfile(fsf2s);
+if IsFileW(fsf2s) then playfile(fsf2s);
 end;
 
 procedure playfile(s:unicodestring);
@@ -354,7 +359,7 @@ if frqi<0 then stitle:=stitle+'(-'+i2s(abs(frqi))+')';
 if bufmul<>2 then stitle:=stitle+'<'+i2s(bufmul)+'>';
 if ch<>chdef then stitle:=stitle+'<='+i2s(ch)+'>';
 if nowindow=BASS_DATA_FFT_NOWINDOW then stitle:=stitle+'<Hn>';
-stitlew:=UnicodeString(stitle)+ExtractFileName(fnames);
+stitlew:=UnicodeString(stitle)+GetFileNameW(fnames);
 if not(Bass_channelIsActive(chan)=BASS_ACTIVE_STOPPED) then
   SetTitleW(stitlew);
 if Bass_channelIsActive(chan)=BASS_ACTIVE_PLAYING then
@@ -485,7 +490,7 @@ end;
 
 procedure helpproc();
 begin
-  if fileexists(fdir+UnicodeString('musicplayer.txt')) then
+  if IsFileW(fdir+UnicodeString('musicplayer.txt')) then
     ShellExecuteW(0,nil, PWChar(UnicodeString('notepad.exe')),PWChar(fdir+UnicodeString('musicplayer.txt')),nil,1)
   else
     MsgBoxW(UnicodeString('Missing help file: ')+fdir+UnicodeString('musicplayer.txt'),UnicodeString('Help file not found!'));
@@ -656,12 +661,12 @@ end;
 begin
 OpenKey();
 hwm:=FindWindow('DisplayClass',nil);
-fdir:=UnicodeString(ParamStrUTF8(0));
+fdir:=UnicodeString(GetParaW(0));
 repeat
 if length(fdir)>0 then delete(fdir,length(fdir),1);
 until (length(fdir)<=1) or (fdir[length(fdir)]='\');
 fsf2s:=fdir+'midi.sf2';
-para:=UnicodeString(ParamStrUTF8(1));
+para:=UnicodeString(GetParaW(1));
 if hwm<>0 then
   if para<>'' then
     begin
