@@ -9,7 +9,7 @@ var framerate:longword=120;
 var oldtime:real=0;
 var newtime:real=0;
 var showfps:boolean;
-var showmode:boolean;
+var showmode:boolean=true;
 const ca:array[0..1]of longword=($9FFFFF,$9F0000);
 const cb:array[0..4]of longword=($1FFF1F,$3F3FFF,$00FFFF,$FF00FF,$FF1F1F);
 const cc:array[-1..11]of longword=(white,
@@ -65,6 +65,13 @@ var lgi:array[0..maxlog]of longint;
 var lgr:array[0..maxlog]of real;
 var hpos:array[0..maxlog-1]of longint;
 var hposc:array[0..maxlog-1]of real;
+var hpos12:array[0..11]of real;
+var hpos120:array[0..11]of real;
+var hpos121:array[0..11]of real;
+var hpos12max:real;
+var hpos12min:real;
+var hpos12c:array[0..11]of real;
+var hpos12n:shortint;
 var x1,y1,x2,y2:longint;
 var modei:array[0..4]of shortint;
 //var modeb:array[0..11]of shortint=(1,0,0,0,0,0,0,1,0,0,0,0);
@@ -73,6 +80,7 @@ const modes:array[-1..11]of ansistring=
 var mode:array[-1..11]of shortint;
 var modec:shortint;
 var fps:longint;
+var fpsc:ansistring;
 
 var hwm:HWND;
 var para:unicodestring;
@@ -384,19 +392,7 @@ for i:=0 to maxlog-1 do
 end;
 
 function getmode(start,step:shortint):shortint;
-//var modea,modeas:array[-1..11]of real;
-begin           {
-getmode:=-1;
-modeas[-1]:=0;
-for i:=start to start+step*12 do
-  modea[i mod 12]:=sqrt(hposc[i]);
-for j:=0 to 11 do
-  begin
-  modeas[j]:=0;
-  for i:=0 to 11 do
-    modeas[j]:=modeas[j]+ln(modea[i]+1)*(modeb[(i-j+24)mod 12]);
-  if modeas[j]>modeas[getmode] then getmode:=j;
-  end;         }
+begin
 getmode:=start;
 for i:=start to start+step*12 do
   if hposc[i]>hposc[getmode] then
@@ -404,14 +400,54 @@ for i:=start to start+step*12 do
 getmode:=getmode mod 12;
 end;
 
+function getmode2(start,step:shortint):shortint;
+begin
+for i:=0 to 11 do hpos120[i]:=0;
+for i:=start to start+step-1 do
+  hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];{
+hpos120[0]:=1;
+hpos120[2]:=1;
+hpos120[4]:=1;
+hpos120[5]:=1;
+hpos120[7]:=1;
+hpos120[9]:=1;
+hpos120[11]:=1;                   }
+for i:=0 to 11 do
+  hpos121[i]:=(
+             +hpos120[(i+0) mod 12]*2
+             +hpos120[(i+2) mod 12]
+             +hpos120[(i+4) mod 12]
+             +hpos120[(i+5) mod 12]*1.5
+             +hpos120[(i+7) mod 12]
+             +hpos120[(i+9) mod 12]
+             +hpos120[(i+11) mod 12]
+             );
+for i:=0 to 11 do
+  hpos12[i]:=(
+//             +hpos121[(i+9*5) mod 12]
+//             +hpos121[(i+10*5) mod 12]
+             +hpos121[(i+11*5) mod 12]
+             +hpos121[(i+0*5) mod 12]
+             +hpos121[(i+1*5) mod 12]
+//             +hpos121[(i+2*5) mod 12]
+//             +hpos121[(i+3*5) mod 12]
+             );
+hpos12max:=0;
+hpos12min:=$7FFFFFFF;
+for i:=0 to 11 do
+  begin
+  if hpos12max<hpos12[i] then hpos12n:=(i+0) mod 12;
+  hpos12max:=max(hpos12max,hpos12[i]);
+  hpos12min:=min(hpos12min,hpos12[i]);
+  end;
+getmode2:=hpos12n;
+end;
+
 function maxr(x,y:real):real;
 begin if x>y then maxr:=x else maxr:=y;end;
 
-procedure drawwin();
+procedure calcbar();
 begin
-Clear();
-_fx:=0;_fy:=0;
-GetData();
 chsum:=1;
 for i:=0 to maxlog-1 do
   begin
@@ -424,6 +460,10 @@ for i:=0 to maxlog-1 do
   hposc[i]:=sqrt(hposc[i]);
   chsum:=chsum+hposc[i];
   end;
+end;
+
+procedure drawbar();
+begin
 for i:=0 to maxlog-1 do
   begin
   x1:=trunc(i/maxlog*_w);
@@ -432,6 +472,10 @@ for i:=0 to maxlog-1 do
   y2:=_h;
   bar(x1,y1,x2-x1,y2-y1,mixcolor(cc[(118-i) mod 12],ca[0],maxlog*hposc[i]/chsum/ch));
   end;
+end;
+
+procedure drawwave();
+begin
 if channum>0 then
 for i:=0 to _w*channum div bufmul+1 do
   begin
@@ -441,6 +485,11 @@ for i:=0 to _w*channum div bufmul+1 do
   y2:=bufi[i+channum];
   line(x1,y1,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
   end;
+end;
+
+procedure drawmode();
+begin
+{
 modei[1]:=getmode(36,1);
 modei[2]:=getmode(48,1);
 modei[3]:=getmode(60,1);
@@ -467,11 +516,66 @@ if showmode then
   else
     drawtextln(modes[modei[0]],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
   end;
+
+modei[1]:=getmode2(36,1);
+modei[2]:=getmode2(48,1);
+modei[3]:=getmode2(60,1);
+modei[4]:=getmode2(36,3);
+for i:=-1 to 11 do mode[i]:=0;
+mode[modei[0]]:=mode[modei[0]]+3;
+mode[modei[1]]:=mode[modei[1]]+2;
+mode[modei[2]]:=mode[modei[2]]+2;
+mode[modei[3]]:=mode[modei[3]]+2;
+mode[modei[4]]:=mode[modei[4]]+2;
+//modec:=5;
+for j:=6 to 13 do
+  for i:=-1 to 11 do
+    if mode[i]=j then
+      begin
+      modei[0]:=i;
+      modec:=j;
+      end;
+modec:=100;
+if showmode then
+  begin
+  if modei[0]>=0 then
+    drawtextln(modes[(modei[0]+frqi+120) mod 12],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
+  else
+    drawtextln(modes[modei[0]],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
+  end;
+}
+getmode2(0,maxlog);
+if showmode then
+  begin
+  drawtextln(modes[hpos12n],cc[(118-hpos12n)mod 12])
+  end;
+for i:=0 to 11 do
+  if hpos12max=hpos12min then
+    hpos12c[i]:=0
+  else
+    hpos12c[i]:=(hpos12[i]-hpos12min)/(hpos12max+12-hpos12min);
+if showmode then
+for i:=0 to 11 do
+  begin
+  j:=(i*5+5)mod 12;
+  x1:=_w;
+  x2:=_w-round(hpos12c[(i+hpos12n) mod 12]*_w)div 8;
+  y1:=trunc((j)/12*_h);
+  y2:=trunc((j+1)/12*_h);
+  bar(x1,y1,x2-x1,y2-y1,cc[(118-i-hpos12n+12)mod 12]);
+  end;
+end;
+
+procedure drawfps();
+begin
 fps:=getfps;
 showfps:=abs(framerate-getfpsr)>1;
-if showfps then drawtextln(i2s(framerate)+'/'+i2s(fps),white);
-line(wpos,0,0,_h,white);
-//line(0,0,trunc(rvol/5*_w),0,yellow);
+fpsc:=i2s(framerate)+'/'+i2s(fps);
+if showfps then drawtextxy(fpsc,_w-round(GetStringWidth(fpsc)*1.1),0,white);
+end;
+
+procedure drawlrc();
+begin
 rvoli:=BASS_ChannelGetLevel(chan);
 rvoli:=hi(rvoli)+lo(rvoli);
 line(0,0,trunc(rvoli/65536*_w),0,yellow);
@@ -485,6 +589,21 @@ for i:=1 to lrcnum do
     end;
 setfontheight(round(_w*2.3)div max(54,length(lrcstr)));
 drawtextxy(lrcstr,max(0,round((_w-getstringwidth(lrcstr))/2)),0,white);
+end;
+
+procedure drawwin();
+begin
+Clear();
+_fx:=0;_fy:=0;
+GetData();
+calcbar();
+drawbar();
+drawmode();
+drawwave();
+drawfps();
+line(wpos,0,0,_h,white);
+//line(0,0,trunc(rvol/5*_w),0,yellow);
+drawlrc();
 freshwin();
 end;
 
@@ -635,6 +754,7 @@ end;
 procedure initwin();
 begin
 _w:=round(getscrwidth/2.5*GetScrCapsX);_h:=round(getscrheight/4*GetScrCapsY);
+_class:='MusicPlayerClass';
 createwin(_w,_h,ca[1],ca[1]);
 _wc.HIcon:=LoadImage(0,'musicplayer.ico',IMAGE_ICON,0,0,LR_LOADFROMFILE);
 sendmessage(_hw,WM_SETICON,ICON_SMALL,longint(_wc.HIcon));
@@ -660,7 +780,7 @@ end;
 
 begin
 OpenKey();
-hwm:=FindWindow('DisplayClass',nil);
+hwm:=FindWindow('MusicPlayerClass',nil);
 fdir:=UnicodeString(GetParaW(0));
 repeat
 if length(fdir)>0 then delete(fdir,length(fdir),1);
