@@ -65,6 +65,8 @@ var lgi:array[0..maxlog]of longint;
 var lgr:array[0..maxlog]of real;
 var hpos:array[0..maxlog-1]of longint;
 var hposc:array[0..maxlog-1]of real;
+var hposc2:array[0..maxlog-1]of real;
+const hposcj:array[1..10]of shortint=(0,12,19,24,28,31,36,38,40,43);
 var hpos12:array[0..11]of real;
 var hpos120:array[0..11]of real;
 var hpos121:array[0..11]of real;
@@ -81,6 +83,12 @@ var mode:array[-1..11]of shortint;
 var modec:shortint;
 var fps:longint;
 var fpsc:ansistring;
+var showmodec:longword;
+var showmodeca,showmodecb,showmodecc,showmodec0:real;
+var showmodeb:pbitmap;
+var showmodecx,showmodecy:longword;
+var showmodecold,showmodecnew:longword;
+var ivol,ivolold,ivolnew:longword;
 
 var hwm:HWND;
 var para:unicodestring;
@@ -327,6 +335,8 @@ if (chan=0) then chan:=Bass_MIDI_StreamCreateFile(false,fname,0,0,loop,1);
 end;
 if chan<>0 then
 begin
+if showmode then clear(showmodeb);
+if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
 checklrc(s);
 sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
 sf.preset:=-1;
@@ -404,14 +414,7 @@ function getmode2(start,step:shortint):shortint;
 begin
 for i:=0 to 11 do hpos120[i]:=0;
 for i:=start to start+step-1 do
-  hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];{
-hpos120[0]:=1;
-hpos120[2]:=1;
-hpos120[4]:=1;
-hpos120[5]:=1;
-hpos120[7]:=1;
-hpos120[9]:=1;
-hpos120[11]:=1;                   }
+  hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];
 for i:=0 to 11 do
   hpos121[i]:=(
              +hpos120[(i+0) mod 12]*2
@@ -442,6 +445,51 @@ for i:=0 to 11 do
   end;
 getmode2:=hpos12n;
 end;
+
+
+function getmode3(start,step:shortint):shortint;
+begin
+for i:=0 to 11 do hpos120[i]:=0;
+for i:=0 to maxlog-1 do
+  begin
+  hposc2[i]:=hposc[i];
+  for j:=2 to 10 do
+    if i+hposcj[j]<maxlog then
+      hposc2[i]:=hposc2[i]-hposc[i+hposcj[j]]/j;
+  end;
+for i:=start to start+step-1 do
+  hpos120[i mod 12]:=hpos120[i mod 12]+hposc2[i];
+for i:=0 to 11 do
+  hpos121[i]:=(
+             +hpos120[(i+0) mod 12]*2{
+             +hpos120[(i+2) mod 12]
+             +hpos120[(i+4) mod 12]
+             +hpos120[(i+5) mod 12]*1.5
+             +hpos120[(i+7) mod 12]
+             +hpos120[(i+9) mod 12]
+             +hpos120[(i+11) mod 12]  }
+             );
+for i:=0 to 11 do
+  hpos12[i]:=(
+//             +hpos121[(i+9*5) mod 12]
+//             +hpos121[(i+10*5) mod 12]
+//             +hpos121[(i+11*5) mod 12]
+             +hpos121[(i+0*5) mod 12]
+//             +hpos121[(i+1*5) mod 12]
+//             +hpos121[(i+2*5) mod 12]
+//             +hpos121[(i+3*5) mod 12]
+             );
+hpos12max:=0;
+hpos12min:=$7FFFFFFF;
+for i:=0 to 11 do
+  begin
+  if hpos12max<hpos12[i] then hpos12n:=(i+0) mod 12;
+  hpos12max:=max(hpos12max,hpos12[i]);
+  hpos12min:=min(hpos12min,hpos12[i]);
+  end;
+getmode3:=hpos12n;
+end;
+
 
 function maxr(x,y:real):real;
 begin if x>y then maxr:=x else maxr:=y;end;
@@ -544,11 +592,20 @@ if showmode then
     drawtextln(modes[modei[0]],mixcolor(cc[(118-modei[0]) mod 12],ca[1],(modec-3)/4))
   end;
 }
+
+
 getmode2(0,maxlog);
 if showmode then
   begin
   drawtextln(modes[hpos12n],cc[(118-hpos12n)mod 12])
   end;
+  {
+getmode3(0,maxlog);
+if showmode then
+  begin
+  drawtextln(modes[hpos12n],cc[(118-hpos12n)mod 12])
+  end;
+  }
 for i:=0 to 11 do
   if hpos12max=hpos12min then
     hpos12c[i]:=0
@@ -564,6 +621,42 @@ for i:=0 to 11 do
   y2:=trunc((j+1)/12*_h);
   bar(x1,y1,x2-x1,y2-y1,cc[(118-i-hpos12n+12)mod 12]);
   end;
+if showmode then
+  begin
+  showmodeca:=hpos12c[(hpos12n+05) mod 12];
+  showmodecb:=hpos12c[(hpos12n+12) mod 12];
+  showmodecc:=hpos12c[(hpos12n+19) mod 12];
+  showmodec:=cc[(118-hpos12n+12)mod 12];
+  if showmodeca>showmodecc then
+    begin
+    showmodec0:=(showmodeca-showmodecc)/(showmodecb-showmodecc);
+    showmodec:=mixcolor(showmodec,cc[(118-hpos12n+12+7)mod 12],showmodec0/2);
+    end;
+  if showmodeca<showmodecc then
+    begin
+    showmodec0:=(showmodecc-showmodeca)/(showmodecb-showmodeca);
+    showmodec:=mixcolor(showmodec,cc[(118-hpos12n+12+5)mod 12],showmodec0/2);
+    end;
+  rvoli:=BASS_ChannelGetLevel(chan);
+  rvoli:=hi(rvoli)+lo(rvoli);
+  ivol:=trunc(rvoli/65536*_h);
+  if showmodecx<>wpos then
+    begin
+    ivolold:=ivolnew;
+    showmodecold:=showmodecnew;
+    showmodecx:=wpos;
+    showmodecy:=0;
+    end;
+  if showmodecy<ivol then
+    begin
+    ivolnew:=round(ivolold*0.5+ivol*0.5);
+    showmodecnew:=mixcolor(showmodec,showmodecold,0.1);
+    showmodecy:=ivolnew;
+    line(showmodeb,showmodecx,0,0,_h,black);
+    line(showmodeb,showmodecx,0,0,showmodecy,showmodecnew);
+//    line(showmodeb,showmodecx,0,0,showmodecy,showmodec);
+    end;
+  end;
 end;
 
 procedure drawfps();
@@ -574,11 +667,16 @@ fpsc:=i2s(framerate)+'/'+i2s(fps);
 if showfps then drawtextxy(fpsc,_w-round(GetStringWidth(fpsc)*1.1),0,white);
 end;
 
-procedure drawlrc();
+procedure drawvol();
 begin
 rvoli:=BASS_ChannelGetLevel(chan);
 rvoli:=hi(rvoli)+lo(rvoli);
 line(0,0,trunc(rvoli/65536*_w),0,yellow);
+//line(0,0,trunc(rvol/5*_w),0,yellow);
+end;
+
+procedure drawlrc();
+begin
 lrcstr:='';
 lrctmax:=0;
 for i:=1 to lrcnum do
@@ -594,6 +692,15 @@ end;
 procedure drawwin();
 begin
 Clear();
+if showmode then
+  begin
+  if(showmodeb^.width<>_w)or(showmodeb^.height<>_h)then
+    begin
+    releasebmp(showmodeb);
+    showmodeb:=createbmp(_w,_h,black);
+    end;
+  drawbmp(showmodeb);
+  end;
 _fx:=0;_fy:=0;
 GetData();
 calcbar();
@@ -602,7 +709,7 @@ drawmode();
 drawwave();
 drawfps();
 line(wpos,0,0,_h,white);
-//line(0,0,trunc(rvol/5*_w),0,yellow);
+drawvol();
 drawlrc();
 freshwin();
 end;
@@ -633,6 +740,7 @@ if (ismouse() or ismsg($200)) and (_ms.wparam=1) then
   if wpos<0 then wpos:=0;
   pos:=trunc(len*wpos/_w);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
+  if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
   end;
 key_shift:=GetKeyState(VK_SHIFT)<0;
 key_ctrl:=GetKeyState(VK_CONTROL)<0;
@@ -648,6 +756,7 @@ if iskey(K_RIGHT) or iskey(K_LEFT) then
   if posr<0 then posr:=0;
   pos:=Bass_ChannelSeconds2Bytes(chan,posr);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
+  if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
   end;
 if iskey(K_UP) or iskey(K_DOWN) or ismousewheel then
   begin
@@ -761,6 +870,7 @@ sendmessage(_hw,WM_SETICON,ICON_SMALL,longint(_wc.HIcon));
 SetTitleW('MusicPlayer made by ax_pokl');
 setfontname('Arial');
 setpenwidth(2);
+showmodeb:=createbmp(_w,_h,black);
 end;
 
 procedure initbass();
