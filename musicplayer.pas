@@ -88,6 +88,7 @@ var showmodeca,showmodecb,showmodecc,showmodec0:real;
 var showmodeb:pbitmap;
 var showmodecx,showmodecy:longword;
 var showmodecold,showmodecnew:longword;
+var showmodecrst:boolean;
 var ivol,ivolold,ivolnew:longword;
 
 var hwm:HWND;
@@ -336,7 +337,7 @@ end;
 if chan<>0 then
 begin
 if showmode then clear(showmodeb);
-if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
+if showmode then begin ivolnew:=0;showmodecrst:=true;end;
 checklrc(s);
 sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
 sf.preset:=-1;
@@ -640,6 +641,14 @@ if showmode then
   rvoli:=BASS_ChannelGetLevel(chan);
   rvoli:=hi(rvoli)+lo(rvoli);
   ivol:=trunc(rvoli/65536*_h);
+  if showmodecrst then
+    begin
+    if wpos>0 then
+      showmodecnew:=getpixel(wpos-1,0)
+   else
+      showmodecnew:=ca[1];
+    showmodecrst:=false;
+    end;
   if showmodecx<>wpos then
     begin
     ivolold:=ivolnew;
@@ -740,7 +749,7 @@ if (ismouse() or ismsg($200)) and (_ms.wparam=1) then
   if wpos<0 then wpos:=0;
   pos:=trunc(len*wpos/_w);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
-  if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
+  if showmode then begin ivolnew:=0;showmodecrst:=true;end;
   end;
 key_shift:=GetKeyState(VK_SHIFT)<0;
 key_ctrl:=GetKeyState(VK_CONTROL)<0;
@@ -756,7 +765,7 @@ if iskey(K_RIGHT) or iskey(K_LEFT) then
   if posr<0 then posr:=0;
   pos:=Bass_ChannelSeconds2Bytes(chan,posr);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
-  if showmode then begin ivolnew:=0;showmodecnew:=ca[1];end;
+  if showmode then begin ivolnew:=0;showmodecrst:=true;end;
   end;
 if iskey(K_UP) or iskey(K_DOWN) or ismousewheel then
   begin
