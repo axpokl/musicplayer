@@ -89,7 +89,9 @@ var showmodeb:pbitmap;
 var showmodecx,showmodecy:longword;
 var showmodecold,showmodecnew:longword;
 var showmodecrst:boolean;
-var ivol,ivolold,ivolnew:longword;
+var ivol,ivolold,ivolnew:longint;
+
+var bb:pbitbuf;
 
 var hwm:HWND;
 var para:unicodestring;
@@ -337,7 +339,7 @@ end;
 if chan<>0 then
 begin
 if showmode then clear(showmodeb);
-if showmode then begin ivolnew:=0;showmodecrst:=true;end;
+if showmode then begin ivolnew:=-1;showmodecrst:=true;end;
 checklrc(s);
 sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
 sf.preset:=-1;
@@ -416,6 +418,8 @@ begin
 for i:=0 to 11 do hpos120[i]:=0;
 for i:=start to start+step-1 do
   hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];
+
+             {
 for i:=0 to 11 do
   hpos121[i]:=(
              +hpos120[(i+0) mod 12]*2
@@ -426,6 +430,27 @@ for i:=0 to 11 do
              +hpos120[(i+9) mod 12]
              +hpos120[(i+11) mod 12]
              );
+              }
+
+
+for i:=0 to 11 do
+  hpos121[i]:=(
+             +hpos120[(i+0) mod 12]/1
+             +hpos120[(i+1) mod 12]/18
+             +hpos120[(i+2) mod 12]/9
+             +hpos120[(i+3) mod 12]/19
+             +hpos120[(i+4) mod 12]/5
+             +hpos120[(i+5) mod 12]/4
+             +hpos120[(i+6) mod 12]/17
+             +hpos120[(i+7) mod 12]/3
+             +hpos120[(i+8) mod 12]/19
+             +hpos120[(i+9) mod 12]/5
+             +hpos120[(i+10) mod 12]/16
+             +hpos120[(i+11) mod 12]/17
+             +hpos120[(i+12) mod 12]/2
+             );
+
+
 for i:=0 to 11 do
   hpos12[i]:=(
 //             +hpos121[(i+9*5) mod 12]
@@ -436,6 +461,7 @@ for i:=0 to 11 do
 //             +hpos121[(i+2*5) mod 12]
 //             +hpos121[(i+3*5) mod 12]
              );
+
 hpos12max:=0;
 hpos12min:=$7FFFFFFF;
 for i:=0 to 11 do
@@ -525,6 +551,8 @@ end;
 
 procedure drawwave();
 begin
+if bb^.bmp<>GetWin() then begin ReleaseBB(bb);bb:=CreateBB(GetWin());end;
+GetBB(bb);
 if channum>0 then
 for i:=0 to _w*channum div bufmul+1 do
   begin
@@ -532,8 +560,10 @@ for i:=0 to _w*channum div bufmul+1 do
   x2:=(i div channum+1)*bufmul;
   y1:=bufi[i];
   y2:=bufi[i+channum];
-  line(x1,y1,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
+//  line(x1,y1,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
+  linebb(bb,x1,y1+20,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
   end;
+if bb^.bmp<>GetWin() then begin ReleaseBB(bb);bb:=CreateBB(GetWin());end else SetBB(bb);
 end;
 
 procedure drawmode();
@@ -615,7 +645,8 @@ for i:=0 to 11 do
 if showmode then
 for i:=0 to 11 do
   begin
-  j:=(i*5+5)mod 12;
+//  j:=(i*5+5)mod 12;
+j:=((118-i-hpos12n+12)*5) mod 12;
   x1:=_w;
   x2:=_w-round(hpos12c[(i+hpos12n) mod 12]*_w)div 8;
   y1:=trunc((j)/12*_h);
@@ -658,7 +689,7 @@ if showmode then
     end;
   if showmodecy<ivol then
     begin
-    ivolnew:=round(ivolold*0.5+ivol*0.5);
+    if ivolold=-1 then ivolnew:=ivol else ivolnew:=round(ivolold*0.5+ivol*0.5);
     showmodecnew:=mixcolor(showmodec,showmodecold,0.1);
     showmodecy:=ivolnew;
     line(showmodeb,showmodecx,0,0,_h,black);
@@ -749,7 +780,7 @@ if (ismouse() or ismsg($200)) and (_ms.wparam=1) then
   if wpos<0 then wpos:=0;
   pos:=trunc(len*wpos/_w);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
-  if showmode then begin ivolnew:=0;showmodecrst:=true;end;
+  if showmode then begin ivolnew:=-1;showmodecrst:=true;end;
   end;
 key_shift:=GetKeyState(VK_SHIFT)<0;
 key_ctrl:=GetKeyState(VK_CONTROL)<0;
@@ -765,7 +796,7 @@ if iskey(K_RIGHT) or iskey(K_LEFT) then
   if posr<0 then posr:=0;
   pos:=Bass_ChannelSeconds2Bytes(chan,posr);
   Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
-  if showmode then begin ivolnew:=0;showmodecrst:=true;end;
+  if showmode then begin ivolnew:=-1;showmodecrst:=true;end;
   end;
 if iskey(K_UP) or iskey(K_DOWN) or ismousewheel then
   begin
@@ -874,6 +905,7 @@ begin
 _w:=round(getscrwidth/2.5*GetScrCapsX);_h:=round(getscrheight/4*GetScrCapsY);
 _class:='MusicPlayerClass';
 createwin(_w,_h,ca[1],ca[1]);
+bb:=CreateBB(getwin());
 _wc.HIcon:=LoadImage(0,'musicplayer.ico',IMAGE_ICON,0,0,LR_LOADFROMFILE);
 sendmessage(_hw,WM_SETICON,ICON_SMALL,longint(_wc.HIcon));
 SetTitleW('MusicPlayer made by ax_pokl');
