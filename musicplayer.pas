@@ -461,12 +461,12 @@ for i:=0 to 11 do
 //             +hpos121[(i+2*5) mod 12]
 //             +hpos121[(i+3*5) mod 12]
              );
-
 hpos12max:=0;
 hpos12min:=$7FFFFFFF;
 for i:=0 to 11 do
   begin
-  if hpos12max<hpos12[i] then hpos12n:=(i+0) mod 12;
+  //if hpos12max<hpos12[i] then hpos12n:=(i+0) mod 12;
+  if hpos12min>hpos12[i] then hpos12n:=(i+6) mod 12;
   hpos12max:=max(hpos12max,hpos12[i]);
   hpos12min:=min(hpos12min,hpos12[i]);
   end;
