@@ -4,7 +4,7 @@ program MusicPlayer;
 uses math,bass,basswma,bassflac,bassape,bassmidi,bass_fx,windows,display;
 
 var i,j:longint;
-var rvoli:longword;
+var rvoli_,rvoli:longword;
 var framerate:longword=120;
 var oldtime:real=0;
 var newtime:real=0;
@@ -89,7 +89,7 @@ var showmodeb:pbitmap;
 var showmodecx,showmodecy:longword;
 var showmodecold,showmodecnew:longword;
 var showmodecrst:boolean;
-var ivol,ivolold,ivolnew:longint;
+var ivol,ivolnew:longint;
 
 var bb:pbitbuf;
 
@@ -669,9 +669,10 @@ if showmode then
     showmodec0:=(showmodecc-showmodeca)/(showmodecb-showmodeca);
     showmodec:=mixcolor(showmodec,cc[(118-hpos12n+12+5)mod 12],showmodec0/2);
     end;
-  rvoli:=BASS_ChannelGetLevel(chan);
-  rvoli:=hi(rvoli)+lo(rvoli);
+  rvoli_:=BASS_ChannelGetLevel(chan);
+  if rvoli_<>$FFFFFFFF then rvoli:=hi(rvoli_)+lo(rvoli_);
   ivol:=trunc(rvoli/65536*_h);
+
   if showmodecrst then
     begin
     if wpos>0 then
@@ -682,14 +683,14 @@ if showmode then
     end;
   if showmodecx<>wpos then
     begin
-    ivolold:=ivolnew;
+    ivolnew:=-1;
     showmodecold:=showmodecnew;
     showmodecx:=wpos;
     showmodecy:=0;
     end;
   if showmodecy<ivol then
     begin
-    if ivolold=-1 then ivolnew:=ivol else ivolnew:=round(ivolold*0.5+ivol*0.5);
+    ivolnew:=max(ivol,ivolnew);
     showmodecnew:=mixcolor(showmodec,showmodecold,0.1);
     showmodecy:=ivolnew;
     line(showmodeb,showmodecx,0,0,_h,black);
@@ -709,8 +710,8 @@ end;
 
 procedure drawvol();
 begin
-rvoli:=BASS_ChannelGetLevel(chan);
-rvoli:=hi(rvoli)+lo(rvoli);
+rvoli_:=BASS_ChannelGetLevel(chan);
+if rvoli_<>$FFFFFFFF then rvoli:=hi(rvoli_)+lo(rvoli_);
 line(0,0,trunc(rvoli/65536*_w),0,yellow);
 //line(0,0,trunc(rvol/5*_w),0,yellow);
 end;
