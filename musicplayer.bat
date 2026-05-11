@@ -9,6 +9,8 @@ del musicplayer.exe
 del musicplayer.zip
 windres.exe -i musicplayer.rc -o musicplayer.res
 fpc -WG musicplayer.pas -omusicplayer.exe -Os
+fpc -WG musicplayer_fft.pas -omusicplayer_fft.exe -Os
+fpc -WG musicplayer_cqt.pas -omusicplayer_cqt.exe -Os
 start musicplayer.exe
 if not exist musicplayer.exe pause
 if not exist musicplayer.exe exit
@@ -31,5 +33,3 @@ del *.ppu
 del *.o
 del *.or
 del *.a
-
-"G:\Program Files\Enigma Virtual Box\enigmavbconsole.exe" musicplayer.evb

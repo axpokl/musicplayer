@@ -10,7 +10,6 @@ var oldtime:real=0;
 var newtime:real=0;
 var showfps:boolean;
 var showmode:boolean=true;
-var cqtmode:longword=1;
 const ca:array[0..1]of longword=($9FFFFF,$9F0000);
 const cb:array[0..4]of longword=($1FFF1F,$3F3FFF,$00FFFF,$FF00FF,$FF1F1F);
 const cc:array[-1..11]of longword=(white,
@@ -22,6 +21,7 @@ var chsum:real;
 
 var stitle:AnsiString;
 var stitlew:UnicodeString;
+var nowindow:longword=0;
 var wpos:longint;
 
 var info:BASS_INFO;
@@ -59,36 +59,6 @@ var buf:array[0..maxbuf-1]of single;
 var bufi:array[0..maxbuf-1]of longint;
 var fft:array[0..maxfft-1]of single;
 var fftlg:array[0..maxlog-1]of single;
-var cqtsharp:array[0..maxlog-1]of single;
-var cqtview:array[0..maxlog-1]of single;
-const maxcqtbuf=$20000;
-const maxcqtfloats=maxcqtbuf div 4;
-var cqtbuf:array[0..maxcqtfloats-1]of single;
-var cqtmono:array[0..maxcqtfloats-1]of single;
-var cqtmono2:array[0..maxcqtfloats-1]of single;
-var cqtmono4:array[0..maxcqtfloats-1]of single;
-var cqtbytes:longint;
-var bufbytes:longint;
-var cqtfloats:longint;
-var cqtframes:longint;
-var cqtframes2:longint;
-var cqtframes4:longint;
-var cqtq:real;
-var cqtqmul:real=1.0;
-var cqtgain:real=4;
-var cqtsharpgain:real=3.5;
-var cqtminfreq:real=55;
-var cqtminwindow:longint=32;
-var cqtcalcstep:longint=2;
-var cqtcalccount:longint=0;
-var cqtneedcalc:boolean=true;
-var cqtlastsr:real=0;
-var cqtf:array[0..maxlog-1]of real;
-var cqtn:array[0..maxlog-1]of longint;
-var cqtncur:array[0..maxlog-1]of longint;
-var cqtdiv:array[0..maxlog-1]of shortint;
-var cqtrotR:array[0..maxlog-1]of real;
-var cqtrotI:array[0..maxlog-1]of real;
 var lgmul:real;
 var lg:array[0..maxlog]of real;
 var lgi:array[0..maxlog]of longint;
@@ -104,10 +74,6 @@ var hpos12max:real;
 var hpos12min:real;
 var hpos12c:array[0..11]of real;
 var hpos12n:shortint;
-var hpos12cand:shortint=-1;
-var hpos12candc:longint=0;
-var hpos12margin:real=0.00;
-var hpos12holdframes:longint=8;
 var x1,y1,x2,y2:longint;
 //var modeb:array[0..11]of shortint=(1,0,0,0,0,0,0,1,0,0,0,0);
 const modes:array[-1..11]of ansistring=
@@ -321,7 +287,7 @@ SetKeyS('fnames',fnames);
 SetKeyS('fsf2s',fsf2s);
 SetKeyQ('pos',pos);
 SetKeyI('voli',voli);
-SetKeyI('cqtmode',cqtmode);
+SetKeyI('nowindow',nowindow);
 SetKeyI('bufmul',bufmul);
 SetKeyI('ch',ch);
 SetKeyI('framerate',framerate);
@@ -336,8 +302,7 @@ GetKeyS('fnames',fnames);
 GetKeyS('fsf2s',fsf2s);
 GetKeyQ('pos',pos);
 GetKeyI('voli',voli);
-GetKeyI('cqtmode',cqtmode);
-if cqtmode<>0 then cqtmode:=1;
+GetKeyI('nowindow',nowindow);
 GetKeyI('bufmul',bufmul);
 GetKeyI('ch',ch);
 GetKeyI('framerate',framerate);
@@ -372,12 +337,6 @@ if chan<>0 then
 begin
 if showmode then clear(showmodeb);
 if showmode then begin ivolnew:=-1;showmodecrst:=true;end;
-hpos12n:=-1;
-hpos12cand:=-1;
-hpos12candc:=0;
-cqtneedcalc:=true;
-cqtcalccount:=0;
-cqtlastsr:=0;
 checklrc(s);
 sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
 sf.preset:=-1;
@@ -393,173 +352,6 @@ BASS_ChannelGetInfo(chan,chaninfo);
 channum:=chaninfo.chans;
 savefile();
 end;
-end;
-
-
-procedure sharpenCQT();
-var p1,p2,n1,n2,avg,v,ratio,sharp,view:real;
-begin
-for i:=0 to maxlog-1 do
-  begin
-  v:=fftlg[i];
-  if i>0 then p1:=fftlg[i-1] else p1:=v;
-  if i>1 then p2:=fftlg[i-2] else p2:=p1;
-  if i<maxlog-1 then n1:=fftlg[i+1] else n1:=v;
-  if i<maxlog-2 then n2:=fftlg[i+2] else n2:=n1;
-  avg:=(p2+p1*2+n1*2+n2)/6;
-  ratio:=v/(avg+0.02);
-  if ratio<0.25 then ratio:=0.25;
-  if ratio>2.5 then ratio:=2.5;
-  view:=v*(0.65+0.35*ratio/2.5);
-  if view>1 then view:=1;
-  cqtview[i]:=view;
-  if cqtf[i]<cqtminfreq then
-    cqtsharp[i]:=0
-  else
-    begin
-    sharp:=v*sqrt(ratio)*cqtsharpgain/3.5;
-    sharp:=sharp/(1+sharp);
-    if sharp<0 then sharp:=0;
-    if sharp>1 then sharp:=1;
-    cqtsharp[i]:=sharp;
-    end;
-  end;
-end;
-
-procedure updateCQTParams(sr:real);
-var phase,effsr:real;
-begin
-if abs(sr-cqtlastsr)<0.01 then exit;
-cqtlastsr:=sr;
-for i:=0 to maxlog-1 do
-  begin
-  if cqtf[i]<110 then cqtdiv[i]:=4
-  else if cqtf[i]<220 then cqtdiv[i]:=2
-  else cqtdiv[i]:=1;
-  effsr:=sr/cqtdiv[i];
-  cqtncur[i]:=trunc(cqtq*effsr/cqtf[i]);
-  if cqtncur[i]<cqtminwindow then cqtncur[i]:=cqtminwindow;
-  phase:=2*pi*cqtf[i]/effsr;
-  cqtrotR[i]:=cos(phase);
-  cqtrotI[i]:=sin(phase);
-  end;
-end;
-
-procedure calcCQT();
-var k,n,chx,frames:longint;
-var sr,cr,ci,nr,ni,rotR,rotI,re,im,w,wscale,norm,sample,mean,mag,tilt:real;
-begin
-for i:=0 to maxlog-1 do
-  begin
-  fftlg[i]:=0;
-  cqtsharp[i]:=0;
-  cqtview[i]:=0;
-  end;
-if cqtbytes<=0 then exit;
-cqtfloats:=cqtbytes div 4;
-if channum<1 then channum:=1;
-cqtframes:=cqtfloats div channum;
-if cqtframes<32 then exit;
-if cqtframes>maxcqtfloats then cqtframes:=maxcqtfloats;
-for k:=0 to cqtframes-1 do
-  begin
-  sample:=0;
-  for chx:=0 to channum-1 do
-    if k*channum+chx<cqtfloats then
-      sample:=sample+cqtbuf[k*channum+chx];
-  cqtmono[k]:=sample/channum;
-  end;
-mean:=0;
-for k:=0 to cqtframes-1 do mean:=mean+cqtmono[k];
-mean:=mean/cqtframes;
-for k:=0 to cqtframes-1 do cqtmono[k]:=cqtmono[k]-mean;
-
-cqtframes2:=cqtframes div 2;
-for k:=0 to cqtframes2-1 do
-  cqtmono2[k]:=(cqtmono[k*2]+cqtmono[k*2+1])*0.5;
-cqtframes4:=cqtframes div 4;
-for k:=0 to cqtframes4-1 do
-  cqtmono4[k]:=(cqtmono[k*4]+cqtmono[k*4+1]+cqtmono[k*4+2]+cqtmono[k*4+3])*0.25;
-
-sr:=freq;
-if sr<=0 then sr:=44100;
-updateCQTParams(sr);
-for i:=0 to maxlog-1 do
-  begin
-  n:=cqtncur[i];
-  if cqtdiv[i]=4 then frames:=cqtframes4
-  else if cqtdiv[i]=2 then frames:=cqtframes2
-  else frames:=cqtframes;
-  if n>frames then n:=frames;
-  if n<32 then continue;
-  rotR:=cqtrotR[i];
-  rotI:=cqtrotI[i];
-  cr:=1;
-  ci:=0;
-  re:=0;
-  im:=0;
-  norm:=0;
-  if n>1 then
-    wscale:=4/((n-1)*(n-1))
-  else
-    wscale:=0;
-  if cqtdiv[i]=4 then
-    begin
-    for k:=0 to n-1 do
-      begin
-      if n>1 then w:=wscale*k*(n-1-k) else w:=1;
-      sample:=cqtmono4[k]*w;
-      re:=re+sample*cr;
-      im:=im-sample*ci;
-      norm:=norm+w;
-      nr:=cr*rotR-ci*rotI;
-      ni:=cr*rotI+ci*rotR;
-      cr:=nr;
-      ci:=ni;
-      end;
-    end
-  else if cqtdiv[i]=2 then
-    begin
-    for k:=0 to n-1 do
-      begin
-      if n>1 then w:=wscale*k*(n-1-k) else w:=1;
-      sample:=cqtmono2[k]*w;
-      re:=re+sample*cr;
-      im:=im-sample*ci;
-      norm:=norm+w;
-      nr:=cr*rotR-ci*rotI;
-      ni:=cr*rotI+ci*rotR;
-      cr:=nr;
-      ci:=ni;
-      end;
-    end
-  else
-    begin
-    for k:=0 to n-1 do
-      begin
-      if n>1 then w:=wscale*k*(n-1-k) else w:=1;
-      sample:=cqtmono[k]*w;
-      re:=re+sample*cr;
-      im:=im-sample*ci;
-      norm:=norm+w;
-      nr:=cr*rotR-ci*rotI;
-      ni:=cr*rotI+ci*rotR;
-      cr:=nr;
-      ci:=ni;
-      end;
-    end;
-  if norm>0 then
-    begin
-    mag:=sqrt(re*re+im*im)/norm*cqtgain;
-    tilt:=1;
-    if cqtf[i]<440 then tilt:=sqrt(cqtf[i]/440);
-    mag:=mag*tilt;
-    fftlg[i]:=mag/(1+mag);
-    end
-  else
-    fftlg[i]:=0;
-  end;
-sharpenCQT();
 end;
 
 procedure getdata();
@@ -584,65 +376,28 @@ if frqi>0 then stitle:=stitle+'(+'+i2s(abs(frqi))+')';
 if frqi<0 then stitle:=stitle+'(-'+i2s(abs(frqi))+')';
 if bufmul<>2 then stitle:=stitle+'<'+i2s(bufmul)+'>';
 if ch<>chdef then stitle:=stitle+'<='+i2s(ch)+'>';
-if cqtmode=0 then stitle:=stitle+'<FFT>';
+if nowindow=BASS_DATA_FFT_NOWINDOW then stitle:=stitle+'<Hn>';
 stitlew:=UnicodeString(stitle)+GetFileNameW(fnames);
 if not(Bass_channelIsActive(chan)=BASS_ACTIVE_STOPPED) then
   SetTitleW(stitlew);
 if Bass_channelIsActive(chan)=BASS_ACTIVE_PLAYING then
   begin
-  if cqtmode<>0 then
-    begin
-    bufbytes:=longint(Bass_ChannelGetData(chan,@buf,maxbuf or BASS_DATA_FLOAT));
-    if bufbytes<0 then bufbytes:=0;
-    for i:=bufbytes div 4 to maxbuf-1 do buf[i]:=0;
-    if cqtcalcstep<1 then cqtcalcstep:=1;
-    cqtcalccount:=cqtcalccount+1;
-    if cqtneedcalc or (cqtcalccount>=cqtcalcstep) then
-      begin
-      cqtbytes:=longint(Bass_ChannelGetData(chan,@cqtbuf,maxcqtbuf or BASS_DATA_FLOAT));
-      if cqtbytes<0 then cqtbytes:=0;
-      calcCQT();
-      cqtneedcalc:=false;
-      cqtcalccount:=0;
-      end;
-    end
-  else
-    begin
-    Bass_ChannelGetData(chan,@fft,BASS_DATA_FFT4096 or BASS_DATA_FFT_NOWINDOW);
-    bufbytes:=longint(Bass_ChannelGetData(chan,@buf,maxbuf or BASS_DATA_FLOAT));
-    if bufbytes<0 then bufbytes:=0;
-    for i:=bufbytes div 4 to maxbuf-1 do buf[i]:=0;
-    end;
-  end
-else
-  begin
-  for i:=0 to maxbuf-1 do buf[i]:=0;
+  Bass_ChannelGetData(chan,@fft,BASS_DATA_FFT4096 or nowindow);
+  Bass_ChannelGetData(chan,@buf,maxbuf or BASS_DATA_FLOAT);
   end;
 for i:=0 to maxbuf-1 do
   bufi[i]:=trunc((buf[i]/2+1/2)*_h);
-if cqtmode<>0 then
+for i:=0 to maxlog-1 do
   begin
-  for i:=0 to maxlog-1 do
-    begin
-    if fftlg[i]<0 then fftlg[i]:=0;
-    hpos[i]:=trunc(sqrt(cqtview[i])*_h*maxlog/128);
-    if hpos[i]>_h then hpos[i]:=_h;
-    end;
-  end
-else
+  fftlg[i]:=(fft[lgi[i+1]]+(fft[lgi[i+1]+1]-fft[lgi[i+1]])*lgr[i+1]/2)*lgr[i+1];
+  fftlg[i]:=fftlg[i]-(fft[lgi[i]]+(fft[lgi[i]+1]-fft[lgi[i]])*lgr[i]/2)*lgr[i];
+  for j:=lgi[i] to lgi[i+1]-1 do fftlg[i]:=fftlg[i]+(fft[j]+fft[j+1])/2;
+  end;
+for i:=0 to maxlog-1 do
   begin
-  for i:=0 to maxlog-1 do
-    begin
-    fftlg[i]:=(fft[lgi[i+1]]+(fft[lgi[i+1]+1]-fft[lgi[i+1]])*lgr[i+1]/2)*lgr[i+1];
-    fftlg[i]:=fftlg[i]-(fft[lgi[i]]+(fft[lgi[i]+1]-fft[lgi[i]])*lgr[i]/2)*lgr[i];
-    for j:=lgi[i] to lgi[i+1]-1 do fftlg[i]:=fftlg[i]+(fft[j]+fft[j+1])/2;
-    end;
-  for i:=0 to maxlog-1 do
-    begin
-    if fftlg[i]<0 then fftlg[i]:=0;
-    hpos[i]:=trunc(sqrt(fftlg[i])*_h*maxlog/128);
-    if hpos[i]>_h then hpos[i]:=_h;
-    end;
+  if fftlg[i]<0 then fftlg[i]:=0;
+  hpos[i]:=trunc(sqrt(fftlg[i])*_h*maxlog/128);
+  if hpos[i]>_h then hpos[i]:=_h;
   end;
 end;
 
@@ -656,21 +411,24 @@ getmode:=getmode mod 12;
 end;
 
 function getmode2(start,step:shortint):shortint;
-var best,worst:shortint;
-var range:real;
 begin
 for i:=0 to 11 do hpos120[i]:=0;
-if cqtmode<>0 then
-  begin
-  for i:=start to start+step-1 do
-    if cqtsharp[i]>0 then
-      hpos120[i mod 12]:=hpos120[i mod 12]+cqtsharp[i];
-  end
-else
-  begin
-  for i:=start to start+step-1 do
-    hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];
-  end;
+for i:=start to start+step-1 do
+  hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];
+
+             {
+for i:=0 to 11 do
+  hpos121[i]:=(
+             +hpos120[(i+0) mod 12]*2
+             +hpos120[(i+2) mod 12]
+             +hpos120[(i+4) mod 12]
+             +hpos120[(i+5) mod 12]*1.5
+             +hpos120[(i+7) mod 12]
+             +hpos120[(i+9) mod 12]
+             +hpos120[(i+11) mod 12]
+             );
+              }
+
 
 for i:=0 to 11 do
   hpos121[i]:=(
@@ -686,75 +444,32 @@ for i:=0 to 11 do
              +hpos120[(i+9) mod 12]/5
              +hpos120[(i+10) mod 12]/16
              +hpos120[(i+11) mod 12]/17
+             +hpos120[(i+12) mod 12]/2
              );
+
 
 for i:=0 to 11 do
   hpos12[i]:=(
+//             +hpos121[(i+9*5) mod 12]
+//             +hpos121[(i+10*5) mod 12]
              +hpos121[(i+11*5) mod 12]
              +hpos121[(i+0*5) mod 12]
              +hpos121[(i+1*5) mod 12]
+//             +hpos121[(i+2*5) mod 12]
+//             +hpos121[(i+3*5) mod 12]
              );
-
-hpos12max:=hpos12[0];
-hpos12min:=hpos12[0];
-best:=0;
-worst:=0;
-for i:=1 to 11 do
+hpos12max:=0;
+hpos12min:=$7FFFFFFF;
+for i:=0 to 11 do
   begin
-  if hpos12max<hpos12[i] then
-    begin
-    hpos12max:=hpos12[i];
-    best:=i;
-    end;
-  if hpos12min>hpos12[i] then
-    begin
-    hpos12min:=hpos12[i];
-    worst:=i;
-    end;
-  end;
-
-if cqtmode<>0 then
-  begin
-  if hpos12n<0 then hpos12n:=best;
-  range:=hpos12max-hpos12min;
-  if best<>hpos12n then
-    begin
-    if hpos12[best]>hpos12[hpos12n]+range*hpos12margin then
-      begin
-      if hpos12cand=best then
-        hpos12candc:=hpos12candc+1
-      else
-        begin
-        hpos12cand:=best;
-        hpos12candc:=1;
-        end;
-      if hpos12candc>=hpos12holdframes then
-        begin
-        hpos12n:=best;
-        hpos12cand:=-1;
-        hpos12candc:=0;
-        end;
-      end
-    else
-      begin
-      hpos12cand:=-1;
-      hpos12candc:=0;
-      end;
-    end
-  else
-    begin
-    hpos12cand:=-1;
-    hpos12candc:=0;
-    end;
-  end
-else
-  begin
-  hpos12n:=(worst+6) mod 12;
-  hpos12cand:=-1;
-  hpos12candc:=0;
+  //if hpos12max<hpos12[i] then hpos12n:=(i+0) mod 12;
+  if hpos12min>hpos12[i] then hpos12n:=(i+6) mod 12;
+  hpos12max:=max(hpos12max,hpos12[i]);
+  hpos12min:=min(hpos12min,hpos12[i]);
   end;
 getmode2:=hpos12n;
 end;
+
 
 function getmode3(start,step:shortint):shortint;
 begin
@@ -922,8 +637,6 @@ if showmode then
 for i:=0 to 11 do
   if hpos12max=hpos12min then
     hpos12c[i]:=0
-  else if cqtmode<>0 then
-    hpos12c[i]:=(hpos12[i]-hpos12min)/(hpos12max-hpos12min)
   else
     hpos12c[i]:=(hpos12[i]-hpos12min)/(hpos12max+12-hpos12min);
 if showmode then
@@ -1143,17 +856,10 @@ if iskey(K_F12) then
   playfile(get_file(find_current));
   end;
 if iskey(K_F11) then showmode:=not(showmode);
-if iskey(K_F2) then
-  begin
-  if cqtmode=0 then cqtmode:=1 else cqtmode:=0;
-  hpos12n:=-1;
-  hpos12cand:=-1;
-  hpos12candc:=0;
-  cqtneedcalc:=true;
-  cqtcalccount:=0;
-  end;
 if iskey(K_SPACE) or ismouseright then
   if not(Bass_ChannelPause(chan)) then Bass_ChannelPlay(chan,false);
+if iskey(K_F2) then
+  nowindow:=BASS_DATA_FFT_NOWINDOW-nowindow;
 if iskey(K_F1) then
   newthread(@helpproc);
 if iskey(K_ESC) then
@@ -1184,9 +890,7 @@ if newtime>oldtime+1/framerate then
   drawwin();
   end
 else
-  begin
-  if framerate>120 then sleep(0) else sleep(1);
-  end;
+  sleep(1);
 end;
 
 procedure DoDrawThread();
@@ -1217,18 +921,10 @@ end;
 procedure initvar();
 begin
 lgmul:=power(2,1/12);
-cqtq:=cqtqmul/(lgmul-1);
 lg[0]:=27.5/(44100/4096)/sqrt(lgmul);
 for i:=1 to maxlog do lg[i]:=lg[i-1]*lgmul;
 for i:=0 to maxlog do lgi[i]:=trunc(lg[i]);
 for i:=0 to maxlog do lgr[i]:=lg[i]-lgi[i];
-for i:=0 to maxlog-1 do
-  begin
-  cqtf[i]:=27.5*power(lgmul,i);
-  cqtn[i]:=trunc(cqtq*44100/cqtf[i]);
-  if cqtn[i]<32 then cqtn[i]:=32;
-  if cqtn[i]>maxcqtfloats then cqtn[i]:=maxcqtfloats;
-  end;
 end;
 
 begin
