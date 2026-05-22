@@ -75,8 +75,9 @@ var cqtframes2:longint;
 var cqtframes4:longint;
 var cqtq:real;
 var cqtqmul:real=1.0;
-var cqtgain:real=2;
+var cqtgain:real=3;
 var cqtsharpgain:real=3.5;
+var cqtviewsmooth:real=0.35;
 var cqtminfreq:real=55;
 var cqtminwindow:longint=32;
 var cqtcalcstep:longint=2;
@@ -391,6 +392,7 @@ hpos12candc:=0;
 cqtneedcalc:=true;
 cqtcalccount:=0;
 cqtlastsr:=0;
+for i:=0 to maxlog-1 do cqtview[i]:=0;
 checklrc(s);
 sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
 sf.preset:=-1;
@@ -426,7 +428,10 @@ for i:=0 to maxlog-1 do
   if ratio>2.5 then ratio:=2.5;
   view:=v*(0.65+0.35*ratio/2.5);
   if view>1 then view:=1;
-  cqtview[i]:=view;
+  if cqtview[i]>0 then
+    cqtview[i]:=cqtview[i]*cqtviewsmooth+view*(1-cqtviewsmooth)
+  else
+    cqtview[i]:=view;
   if cqtf[i]<cqtminfreq then
     cqtsharp[i]:=0
   else
@@ -467,13 +472,20 @@ for i:=0 to maxlog-1 do
   begin
   fftlg[i]:=0;
   cqtsharp[i]:=0;
-  cqtview[i]:=0;
   end;
-if cqtbytes<=0 then exit;
+if cqtbytes<=0 then
+  begin
+  for i:=0 to maxlog-1 do cqtview[i]:=0;
+  exit;
+  end;
 cqtfloats:=cqtbytes div 4;
 if channum<1 then channum:=1;
 cqtframes:=cqtfloats div channum;
-if cqtframes<32 then exit;
+if cqtframes<32 then
+  begin
+  for i:=0 to maxlog-1 do cqtview[i]:=0;
+  exit;
+  end;
 if cqtframes>maxcqtfloats then cqtframes:=maxcqtfloats;
 for k:=0 to cqtframes-1 do
   begin
