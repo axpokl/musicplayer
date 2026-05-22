@@ -75,7 +75,7 @@ var cqtframes2:longint;
 var cqtframes4:longint;
 var cqtq:real;
 var cqtqmul:real=1.0;
-var cqtgain:real=4;
+var cqtgain:real=2;
 var cqtsharpgain:real=3.5;
 var cqtminfreq:real=55;
 var cqtminwindow:longint=32;
@@ -348,6 +348,19 @@ Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
 if IsFileW(fsf2s) then playfile(fsf2s);
 end;
 
+procedure updateFFTParams(sr:real);
+begin
+if sr<=0 then sr:=44100;
+lg[0]:=27.5/(sr/4096)/sqrt(lgmul);
+for i:=1 to maxlog do lg[i]:=lg[i-1]*lgmul;
+for i:=0 to maxlog do
+  begin
+  lgi[i]:=trunc(lg[i]);
+  lgr[i]:=lg[i]-lgi[i];
+  if lgi[i]>maxfft-2 then begin lgi[i]:=maxfft-2;lgr[i]:=0;end;
+  end;
+end;
+
 procedure playfile(s:unicodestring);
 begin
 if copy(s,length(s)-2,3)='sf2' then fsf2s:=s
@@ -386,6 +399,7 @@ Bass_MIDI_StreamSetFonts(chan,PBASS_MIDI_FONT(@sf),1);
 Bass_channelPlay(chan,false);
 BASS_ChannelSetAttribute(chan,BASS_ATTRIB_VOL,vola[voli]);
 BASS_ChannelGetAttribute(chan,BASS_ATTRIB_FREQ,freq);
+updateFFTParams(freq);
 spd:=1;spdi:=0;
 pch:=1;pchi:=0;
 frq:=1;frqi:=0;
@@ -1218,10 +1232,7 @@ procedure initvar();
 begin
 lgmul:=power(2,1/12);
 cqtq:=cqtqmul/(lgmul-1);
-lg[0]:=27.5/(44100/4096)/sqrt(lgmul);
-for i:=1 to maxlog do lg[i]:=lg[i-1]*lgmul;
-for i:=0 to maxlog do lgi[i]:=trunc(lg[i]);
-for i:=0 to maxlog do lgr[i]:=lg[i]-lgi[i];
+updateFFTParams(44100);
 for i:=0 to maxlog-1 do
   begin
   cqtf[i]:=27.5*power(lgmul,i);
