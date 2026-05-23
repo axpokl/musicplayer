@@ -75,9 +75,9 @@ var cqtframes2:longint;
 var cqtframes4:longint;
 var cqtq:real;
 var cqtqmul:real=1.0;
-var cqtgain:real=3;
+var cqtgain:real=4;
 var cqtsharpgain:real=3.5;
-var cqtviewsmooth:real=0.35;
+var cqtviewsmooth:real=0.55;
 var cqtminfreq:real=55;
 var cqtminwindow:longint=32;
 var cqtcalcstep:longint=2;
@@ -109,6 +109,8 @@ var hpos12cand:shortint=-1;
 var hpos12candc:longint=0;
 var hpos12margin:real=0.00;
 var hpos12holdframes:longint=8;
+const hpos12start=15;
+const hpos12step=60;
 var x1,y1,x2,y2:longint;
 //var modeb:array[0..11]of shortint=(1,0,0,0,0,0,0,1,0,0,0,0);
 const modes:array[-1..11]of ansistring=
@@ -681,6 +683,16 @@ for i:=start to start+step*12 do
 getmode:=getmode mod 12;
 end;
 
+function hpos12weight(n:longint):real;
+var o:longint;
+begin
+o:=n-hpos12start;
+if o<12 then hpos12weight:=0.70
+else if o<36 then hpos12weight:=1.00
+else if o<48 then hpos12weight:=0.80
+else hpos12weight:=0.45;
+end;
+
 function getmode2(start,step:shortint):shortint;
 var best,worst:shortint;
 var range:real;
@@ -690,12 +702,12 @@ if cqtmode<>0 then
   begin
   for i:=start to start+step-1 do
     if cqtsharp[i]>0 then
-      hpos120[i mod 12]:=hpos120[i mod 12]+cqtsharp[i];
+      hpos120[i mod 12]:=hpos120[i mod 12]+cqtsharp[i]*hpos12weight(i);
   end
 else
   begin
   for i:=start to start+step-1 do
-    hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i];
+    hpos120[i mod 12]:=hpos120[i mod 12]+hposc[i]*hpos12weight(i);
   end;
 
 for i:=0 to 11 do
@@ -933,7 +945,7 @@ if showmode then
 }
 
 
-getmode2(0,maxlog);
+getmode2(hpos12start,hpos12step);
 if showmode then
   begin
   drawtextln(modes[hpos12n],cc[(118-hpos12n)mod 12])
