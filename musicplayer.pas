@@ -159,9 +159,11 @@ var size:longword=8;
 var ih,io:longword;
 begin
 if RegQueryValueEx(regkey,PChar(kname),nil,@regtype,@ca,@size)=ERROR_SUCCESS then
+  begin
   ih:=ca[7] shl 24 or ca[6] shl 16 or ca[5] shl 8 or ca[4];
   io:=ca[3] shl 24 or ca[2] shl 16 or ca[1] shl 8 or ca[0];
-  i:=ih shl 32 or io;
+  i:=qword(ih) shl 32 or io;
+  end;
 end;
 
 procedure GetKeyI(kname:ansistring;var i:longword);
@@ -198,7 +200,7 @@ var find_dir:unicodestring;
 
 procedure add_file(s:unicodestring);
 begin
-if (find_info.cFilename<>'.') and (find_info.cFilename<>'..') then
+if (find_count<find_max) and (find_info.cFilename<>'.') and (find_info.cFilename<>'..') then
   begin
   find_count:=find_count+1;
   find_result[find_count]:=find_dir+UnicodeString(find_info.cFilename);
@@ -223,6 +225,7 @@ if find_current>find_count then
     begin
     add_file(s);
     while FindNextFileW(find_handle,find_info) do add_file(s);
+    FindClose(find_handle);
     end;
   end;
 end;
@@ -280,8 +283,10 @@ var flrc:text;
 var lrc:ansistring;
 begin
 lrcnum:=0;
+j:=0;
 if length(s)>0 then
 for i:=1 to length(s) do if s[i]='.' then j:=i;
+if j=0 then exit;
 s:=copy(s,1,j-1)+'.lrc';
 //if fileexists(s) then
 //else s:=copy(s,1,j-1)+'.txt';
@@ -294,7 +299,7 @@ if IsFileW(s) then
     readln(flrc,lrc);
     if length(lrc)>=10 then
       begin
-      if (lrc[1]='[') and (lrc[4]=':') and (lrc[7]='.') and (lrc[10]=']') then
+      if (lrcnum<maxlrc) and (lrc[1]='[') and (lrc[4]=':') and (lrc[7]='.') and (lrc[10]=']') then
         begin
         lrcnum:=lrcnum+1;
         lrct[lrcnum]:=(ord(lrc[2])-48)*10+ord(lrc[3])-48;
@@ -302,7 +307,7 @@ if IsFileW(s) then
         lrct[lrcnum]:=lrct[lrcnum]*1000+((ord(lrc[8])-48)*10+ord(lrc[9])-48)*10;
         lrcs[lrcnum]:=copy(lrc,11,length(lrc)-10);
         end;
-      if (lrc[1]='[') and (lrc[3]=':') and (lrc[6]='.') and (lrc[10]=']') then
+      if (lrcnum<maxlrc) and (lrc[1]='[') and (lrc[3]=':') and (lrc[6]='.') and (lrc[10]=']') then
         begin
         lrcnum:=lrcnum+1;
         lrct[lrcnum]:=ord(lrc[2])-48;
@@ -343,6 +348,12 @@ GetKeyI('bufmul',bufmul);
 GetKeyI('ch',ch);
 GetKeyI('framerate',framerate);
 GetKeyI('loop',loop);
+if voli<1 then voli:=1;
+if voli>volal then voli:=volal;
+if bufmul<1 then bufmul:=1;
+if ch<1 then ch:=1;
+if ch>512 then ch:=512;
+if framerate<1 then framerate:=120;
 if (para<>'') and (para<>fnames) then begin fnames:=para;pos:=0;end;
 if IsFileW(fnames) then playfile(fnames);
 Bass_ChannelSetPosition(chan,pos,BASS_POS_BYTE);
@@ -362,9 +373,34 @@ for i:=0 to maxlog do
   end;
 end;
 
+procedure applymidifont();
+var oldfont:longword;
+begin
+if (chan<>0) and IsFileW(fsf2s) then
+  begin
+  oldfont:=sf.font;
+  sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
+  if sf.font<>0 then
+    begin
+    sf.preset:=-1;
+    sf.bank:=0;
+    Bass_MIDI_StreamSetFonts(chan,PBASS_MIDI_FONT(@sf),1);
+    if oldfont<>0 then Bass_MIDI_FontFree(oldfont);
+    end
+  else
+    sf.font:=oldfont;
+  end;
+end;
+
 procedure playfile(s:unicodestring);
 begin
-if copy(s,length(s)-2,3)='sf2' then fsf2s:=s
+if copy(s,length(s)-2,3)='sf2' then
+  begin
+  fsf2s:=s;
+  applymidifont();
+  savefile();
+  exit;
+  end
 else
 begin
 find_file(s);
@@ -394,10 +430,7 @@ cqtcalccount:=0;
 cqtlastsr:=0;
 for i:=0 to maxlog-1 do cqtview[i]:=0;
 checklrc(s);
-sf.font:=Bass_MIDI_FontInit(PChar(fsf2s),0);
-sf.preset:=-1;
-sf.bank:=0;
-Bass_MIDI_StreamSetFonts(chan,PBASS_MIDI_FONT(@sf),1);
+applymidifont();
 Bass_channelPlay(chan,false);
 BASS_ChannelSetAttribute(chan,BASS_ATTRIB_VOL,vola[voli]);
 BASS_ChannelGetAttribute(chan,BASS_ATTRIB_FREQ,freq);
@@ -871,15 +904,15 @@ procedure drawwave();
 begin
 if bb^.bmp<>GetWin() then begin ReleaseBB(bb);bb:=CreateBB(GetWin());end;
 GetBB(bb);
-if channum>0 then
-for i:=0 to _w*channum div bufmul+1 do
+if (channum>0) and (channum<maxbuf) then
+for i:=0 to min(_w*channum div bufmul+1,maxbuf-channum-1) do
   begin
   x1:=i div channum*bufmul;
   x2:=(i div channum+1)*bufmul;
   y1:=bufi[i];
   y2:=bufi[i+channum];
-//  line(x1,y1,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
-  linebb(bb,x1,y1+20,x2-x1,y2-y1,cb[channum-(i mod channum)-1]);
+//  line(x1,y1,x2-x1,y2-y1,cb[(channum-(i mod channum)-1) mod 5]);
+  linebb(bb,x1,y1+20,x2-x1,y2-y1,cb[(channum-(i mod channum)-1) mod 5]);
   end;
 if bb^.bmp<>GetWin() then begin ReleaseBB(bb);bb:=CreateBB(GetWin());end else SetBB(bb);
 end;
@@ -979,12 +1012,12 @@ if showmode then
   showmodecb:=hpos12c[(hpos12n+12) mod 12];
   showmodecc:=hpos12c[(hpos12n+19) mod 12];
   showmodec:=cc[(118-hpos12n+12)mod 12];
-  if showmodeca>showmodecc then
+  if (showmodeca>showmodecc) and (showmodecb<>showmodecc) then
     begin
     showmodec0:=(showmodeca-showmodecc)/(showmodecb-showmodecc);
     showmodec:=mixcolor(showmodec,cc[(118-hpos12n+12+7)mod 12],showmodec0/2);
     end;
-  if showmodeca<showmodecc then
+  if (showmodeca<showmodecc) and (showmodecb<>showmodeca) then
     begin
     showmodec0:=(showmodecc-showmodeca)/(showmodecb-showmodeca);
     showmodec:=mixcolor(showmodec,cc[(118-hpos12n+12+5)mod 12],showmodec0/2);
@@ -1311,4 +1344,7 @@ else delay(1);
 until not(IsWin);
 Bass_ChannelStop(chan);
 savefile();
+if sf.font<>0 then Bass_MIDI_FontFree(sf.font);
+Bass_Free();
+CloseKey();
 end.
