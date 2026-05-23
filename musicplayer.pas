@@ -13,9 +13,7 @@ var showmode:boolean=true;
 var cqtmode:longword=1;
 const ca:array[0..1]of longword=($9FFFFF,$9F0000);
 const cb:array[0..4]of longword=($1FFF1F,$3F3FFF,$00FFFF,$FF00FF,$FF1F1F);
-const cc:array[-1..11]of longword=(white,
-$FFFF00,$1F9FFF,$FF3F3F,$1FFF9F,$FF00FF,$9FFF1F,
-$3F3FFF,$FF9F1F,$00FFFF,$FF1F9F,$3FFF3F,$9F1FFF);
+var cc:array[-1..11]of longword;
 const chdef=8;
 var ch:longword=chdef;
 var chsum:real;
@@ -1252,8 +1250,21 @@ Bass_Init(-1,44100,0,0,nil);
 BASS_GetInfo(info);
 end;
 
+procedure initcc();
+var ci:longint;
+var r,g,b:double;
+begin
+cc[-1]:=white;
+for ci:=0 to 11 do
+  begin
+  HSI2RGB(((6+ci*7) mod 12)/12,1,0.6,r,g,b);
+  Double2Long(r,g,b,0,cc[ci]);
+  end;
+end;
+
 procedure initvar();
 begin
+initcc();
 lgmul:=power(2,1/12);
 cqtq:=cqtqmul/(lgmul-1);
 updateFFTParams(44100);
